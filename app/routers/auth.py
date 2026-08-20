@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from datetime import timedelta, datetime
 from ..database import get_db, User
 from ..plan import plan_label, user_limit as plan_user_limit
-from ..schemas import UserLogin, Token, UserResponse, UserCreate, UserUpdate
+from ..schemas import (UserLogin, Token, UserResponse, UserCreate, UserUpdate,
+                       ProfileResponse, ProfileUpdate, PasswordChange)
 from ..auth import (
     verify_password,
     get_password_hash,
@@ -133,6 +134,135 @@ async def logout(response: Response):
     except Exception:
         pass
     return {"message": "Déconnexion réussie"}
+
+# ---------------------------------------------------------------------------
+# Son propre compte
+# ---------------------------------------------------------------------------
+# Distinct des routes `/users/{id}`, réservées aux administrateurs : sans cela,
+# un vendeur ne pourrait pas corriger lui-même son adresse ni changer son mot de
+# passe. Ce qui touche aux droits — rôle, activation, nom de connexion — reste
+# hors de portée : ces trois champs ne sont simplement pas lus ici.
+
+
+def _compte_courant(db: Session, current_user) -> User:
+    """L'enregistrement en base derrière le jeton présenté.
+
+    `get_current_user` peut rendre un objet bâti sur les attributions du jeton
+    (mode sans base) : on relit donc toujours la ligne, seule source fiable pour
+    écrire dessus.
+    """
+    identifiant = getattr(current_user, "user_id", None)
+    if identifiant is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session invalide")
+    utilisateur = db.query(User).filter(User.user_id == int(identifiant)).first()
+    if utilisateur is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compte introuvable")
+    return utilisateur
+
+
+@router.get("/me", response_model=ProfileResponse)
+async def lire_mon_profil(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Son propre compte, dernière connexion comprise."""
+    return ProfileResponse.from_orm(_compte_courant(db, current_user))
+
+
+@router.put("/me", response_model=ProfileResponse)
+async def modifier_mon_profil(
+    payload: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Nom affiché et adresse électronique. Rien d'autre."""
+    utilisateur = _compte_courant(db, current_user)
+
+    if payload.email is not None:
+        adresse = str(payload.email).strip().lower()
+        doublon = db.query(User).filter(
+            User.email == adresse, User.user_id != utilisateur.user_id
+        ).first()
+        if doublon:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cette adresse email est déjà utilisée par un autre compte"
+            )
+        utilisateur.email = adresse
+
+    if payload.full_name is not None:
+        # Une chaîne vide vaut « pas de nom complet » : la barre retombe alors
+        # sur le nom de connexion, plutôt que d'afficher un vide.
+        utilisateur.full_name = payload.full_name.strip() or None
+
+    db.commit()
+    db.refresh(utilisateur)
+
+    # Le nom et l'adresse affichés dans la barre viennent du cache d'état des
+    # comptes : sans cette invalidation, la correction n'apparaîtrait qu'au bout
+    # de AUTH_CACHE_SECONDS.
+    invalider_utilisateur(utilisateur.user_id)
+    return ProfileResponse.from_orm(utilisateur)
+
+
+@router.post("/me/password")
+async def changer_mon_mot_de_passe(
+    payload: PasswordChange,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Changer son mot de passe, l'actuel faisant foi."""
+    utilisateur = _compte_courant(db, current_user)
+
+    if not verify_password(payload.current_password, utilisateur.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mot de passe actuel incorrect"
+        )
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Le nouveau mot de passe doit être différent de l'actuel"
+        )
+
+    utilisateur.password_hash = get_password_hash(payload.new_password)
+    db.commit()
+
+    # Changer son mot de passe doit fermer les sessions ouvertes ailleurs —
+    # c'est tout l'intérêt de le changer quand on se croit compromis.
+    epoch = revoquer_sessions(db, utilisateur.user_id)
+
+    # Mais la révocation vaut aussi pour la session qui vient d'agir : sans le
+    # jeton neuf ci-dessous, l'écran se ferait éjecter vers la connexion à la
+    # requête suivante, et l'opération passerait pour un échec.
+    nouveau_jeton = create_access_token(
+        data={
+            "sub": utilisateur.username,
+            "user_id": utilisateur.user_id,
+            "email": utilisateur.email,
+            "full_name": utilisateur.full_name,
+            "role": utilisateur.role,
+            "is_active": bool(utilisateur.is_active),
+            "epoch": epoch,
+        },
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    try:
+        response.set_cookie(
+            key=AUTH_COOKIE_NAME,
+            value=nouveau_jeton,
+            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            httponly=True,
+            samesite=AUTH_COOKIE_SAMESITE,
+            secure=AUTH_COOKIE_SECURE,
+            path=AUTH_COOKIE_PATH,
+        )
+    except Exception:
+        pass
+
+    return {"message": "Mot de passe modifié. Les autres sessions ont été fermées."}
+
 
 @router.post("/register", response_model=UserResponse)
 async def register(

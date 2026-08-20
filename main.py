@@ -1180,6 +1180,17 @@ async def settings_page(request: Request, db: Session = Depends(get_db),
     """Page des paramètres de l'application"""
     return templates.TemplateResponse("settings.html", {"request": request, "global_settings": _load_company_settings(db)})
 
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request, db: Session = Depends(get_db),
+                  current_user = Depends(require_page_login)):
+    """Son propre compte : nom affiché, adresse, mot de passe.
+
+    Séparée de /settings, qui règle l'application pour tout le monde et n'est
+    ouverte qu'aux administrateurs sur ses onglets sensibles. Ici, chacun agit
+    sur son seul compte, quel que soit son rôle.
+    """
+    return templates.TemplateResponse("profile.html", {"request": request, "global_settings": _load_company_settings(db)})
+
 @app.get("/suppliers", response_class=HTMLResponse)
 async def suppliers_page(request: Request, db: Session = Depends(get_db),
                   current_user = Depends(require_page_login)):

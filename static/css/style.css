@@ -259,43 +259,30 @@ h1, h2, h3, h4, h5, h6 {
   border-block-end: 1px solid hsl(var(--border));
 }
 
-.app-topbar__brand {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: none;
-  margin-inline-end: 0.25rem;
-  text-decoration: none;
-  color: inherit;
-}
+.app-topbar__brand { display: flex; align-items: center; flex: none; }
 
 .app-topbar__mark {
   display: grid;
   place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 2.125rem;
+  height: 2.125rem;
   flex: none;
+  padding: 0;
+  border: 1px solid hsl(var(--border));
   border-radius: var(--radius-sm);
-  background-color: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  font-size: 0.875rem;
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 0.8125rem;
   overflow: hidden;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
+
+.app-topbar__mark:hover,
+.app-topbar__mark[aria-expanded="true"] { background-color: hsl(var(--accent)); }
+
+.app-topbar__initials { font-weight: 600; letter-spacing: 0.02em; }
 
 .app-topbar__mark img { width: 100%; height: 100%; object-fit: cover; }
-
-.app-topbar__brand-name {
-  font-size: 0.9375rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-}
-
-/* Le nom cède la place à la navigation dès que la barre se remplit : la
-   pastille suffit à identifier l'application. */
-@media (max-width: 1399.98px) {
-  .app-topbar__brand-name { display: none; }
-}
 
 /* Ouvre le panneau de navigation ; visible sous le point de bascule seulement. */
 .app-topbar__burger {
@@ -320,11 +307,15 @@ h1, h2, h3, h4, h5, h6 {
 /* `flex: none` : c'est la recherche qui absorbe le manque de place (elle a son
    propre `flex: 1 1 auto` plus bas), pas la navigation — dont les libellés ne
    se coupent pas et déborderaient. */
+/* Centrée dans la barre, et non dans l'espace restant : les blocs de gauche et
+   de droite n'ont pas la même largeur, un `margin: auto` la décalerait. */
 .app-topnav {
+  position: absolute;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 0.125rem;
-  flex: none;
 }
 
 .app-topnav__group { position: relative; }
@@ -450,29 +441,6 @@ h1, h2, h3, h4, h5, h6 {
   color: hsl(var(--foreground));
 }
 
-.app-topbar__account {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  padding: 0;
-  border: none;
-  background-color: transparent;
-}
-
-.app-topbar__avatar {
-  display: grid;
-  place-items: center;
-  width: 1.875rem;
-  height: 1.875rem;
-  border-radius: 999px;
-  background-color: hsl(var(--secondary));
-  color: hsl(var(--secondary-foreground));
-  font-size: 0.8125rem;
-  transition: background-color 0.15s ease;
-}
-
-.app-topbar__account:hover .app-topbar__avatar { background-color: hsl(var(--accent)); }
-
 /* En-tête du menu du compte : le nom et le rôle, qui étaient au pied de la
    barre latérale. */
 .app-topbar__account-head {
@@ -491,6 +459,95 @@ h1, h2, h3, h4, h5, h6 {
 .app-topbar__account-head > span:last-child {
   font-size: 0.6875rem;
   color: hsl(var(--muted-foreground));
+}
+
+.app-topbar__divider {
+  width: 1px;
+  height: 1.5rem;
+  flex: none;
+  margin-inline: 0.5rem 0.25rem;
+  background-color: hsl(var(--border));
+}
+
+/* Repère de position, à la place du fil d'Ariane. */
+.app-topbar__current {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  padding-inline: 0.375rem;
+  color: hsl(var(--foreground));
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.app-topbar__current i { font-size: 0.9375rem; opacity: 0.7; }
+.app-topbar__current:hover { color: hsl(var(--foreground)); opacity: 0.7; }
+
+/* Bord droit : recherche et appel à l'action. La marge automatique est portée
+   par l'enveloppe, pas par le bouton — placée sur ce dernier, elle repousserait
+   l'espace libre entre les deux et laisserait la recherche près de la
+   navigation. La navigation, hors flux, ne compte pas dans ce calcul. */
+.app-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: none;
+  margin-inline-start: auto;
+}
+
+.app-topbar__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  height: 2.25rem;
+  padding-inline: 0.875rem;
+  border-radius: var(--radius-sm);
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: opacity 0.15s ease, transform var(--duration-fast) ease;
+}
+
+.app-topbar__cta:hover { opacity: 0.9; color: hsl(var(--primary-foreground)); }
+.app-topbar__cta:active { transform: scale(0.98); }
+.app-topbar__cta i { font-size: 0.875rem; }
+
+/* Intitulés de section dans « Plus », qui réunit Achats et Outils. */
+.app-topnav__section {
+  padding: 0.5rem 0.625rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.app-topnav__section:first-child { padding-block-start: 0.25rem; }
+
+.app-mobnav__section {
+  padding: 0.625rem 0.25rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Sous 768 px, le libellé de page et celui du bouton cèdent : la tuile et
+   l'icône suffisent, et la barre ne déborde pas. */
+@media (max-width: 767.98px) {
+  .app-topbar__current,
+  .app-topbar__divider { display: none; }
+  .app-topbar__cta { padding-inline: 0.625rem; }
+  .app-topbar__cta span { display: none; }
 }
 
 /* --- Bascule vers le panneau, sur écrans étroits ------------------------- */
@@ -701,11 +758,24 @@ body.embedded .app-main { padding: 1rem; }
    Recherche de la barre supérieure
    ========================================================================== */
 
+/* Hors flux : la barre reste épurée, la recherche descend sous elle à l'appui
+   de « / ». Posée sur le contenu, elle prend un fond opaque et une ombre — la
+   barre, elle, se contente d'un flou d'arrière-plan. */
 .navbar-search-wrapper {
-  position: relative;
-  flex: 1 1 auto;
-  max-width: 24rem;
-  margin-inline-start: auto;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  inset-inline-end: 0.875rem;
+  width: min(26rem, calc(100vw - 1.75rem));
+  z-index: 1040;
+}
+
+.navbar-search-wrapper[hidden] { display: none; }
+
+.navbar-search-wrapper .navbar-search-group {
+  height: 2.5rem;
+  background-color: hsl(var(--popover));
+  border-color: hsl(var(--border));
+  box-shadow: var(--shadow-lg);
 }
 
 .navbar-search-group {

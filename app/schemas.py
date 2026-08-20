@@ -34,6 +34,37 @@ class UserResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class ProfileResponse(UserResponse):
+    """Son propre compte, tel que l'écran « Mon profil » l'affiche.
+
+    Ajoute la dernière connexion, que `UserResponse` ne porte pas : elle n'a de
+    sens que pour soi-même — la donner sur la liste des comptes reviendrait à
+    exposer les horaires de chacun à tous.
+    """
+    last_login: Optional[datetime] = None
+
+
+class ProfileUpdate(BaseModel):
+    """Ce que l'on peut changer sur son propre compte.
+
+    Volontairement séparé de `UserUpdate`, qui porte `role` : le réutiliser ici
+    laisserait n'importe qui se nommer administrateur en glissant un champ de
+    plus dans la requête. Le rôle, le nom de connexion et l'activation restent
+    des décisions d'administration.
+    """
+    full_name: Optional[str] = Field(default=None, max_length=120)
+    email: Optional[EmailStr] = None
+
+
+class PasswordChange(BaseModel):
+    """Changement de son propre mot de passe.
+
+    L'actuel est exigé : sans lui, une session laissée ouverte sur un poste
+    partagé suffirait à s'approprier le compte définitivement.
+    """
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
 # Schémas pour les catégories d'achats quotidiens
 class DailyPurchaseCategoryCreate(BaseModel):
     name: str

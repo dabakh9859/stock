@@ -134,6 +134,10 @@
     et `is_current()` (défini dans main.py) lit `scope["path"]`. Le préfixe n'est
     reposé qu'à l'affichage du lien.
   #}
+  {# « Plus » ne réunit plus que les outils. Le rendu des intitulés de section
+     reste en place dans la barre : aucune entrée n'en porte aujourd'hui, mais
+     regrouper un jour deux familles sous un même menu ne demandera qu'une clé
+     `section` sur chaque entrée concernée. #}
   {% set nav_groups = [
     {'key': 'stock', 'label': 'Stock', 'icon': 'bi-box-seam', 'admin': false, 'items': [
       {'path': '/products', 'icon': 'bi-boxes', 'label': 'Produits', 'exact': false},
@@ -170,7 +174,7 @@
       {'path': '/boutique/zones', 'icon': 'bi-geo-alt', 'label': 'Zones de livraison', 'exact': false},
       {'path': '/boutique/configuration', 'icon': 'bi-sliders', 'label': 'Configuration', 'exact': false}
     ]},
-    {'key': 'outils', 'label': 'Outils', 'icon': 'bi-wrench-adjustable', 'admin': false, 'items': [
+    {'key': 'plus', 'label': 'Plus', 'icon': 'bi-three-dots', 'admin': false, 'items': [
       {'path': '/maintenances', 'icon': 'bi-tools', 'label': 'Maintenance', 'exact': false, 'feature': 'maintenance', 'metier': 'atelier'},
       {'path': '/produits/doublons', 'icon': 'bi-union', 'label': 'Doublons produits', 'exact': false},
       {'path': '/whatsapp', 'icon': 'bi-whatsapp', 'label': 'WhatsApp', 'exact': false, 'feature': 'whatsapp'},
@@ -203,115 +207,26 @@
     <!-- Barre de navigation supérieure -->
     <header class="app-topbar" id="appTopbar">
       {% set _logo_global = (global_settings.logo or global_settings.logo_path) if global_settings is defined else None %}
-      <a class="app-topbar__brand" href="{{ URL_PREFIX }}/" title="{{ _app_name }}">
-        <span class="app-topbar__mark">
+
+      {# Repli de la pastille quand aucun logo n'est chargé : deux lettres
+         tiennent là où le nom complet ne tiendrait pas. #}
+      {% set _mots = ((_app_name or 'Stock').split() or ['Stock']) %}
+      {% set _initiales = ((_mots[0][0] ~ (_mots[1][0] if _mots | length > 1 else _mots[0][1:2])) | upper) %}
+
+      {# Marque et compte partagent la même tuile. La barre ne laisse plus rien
+         à droite hormis l'appel à l'action, et le menu du compte doit rester
+         atteignable : le clic l'ouvre. Le retour à l'accueil reste porté par le
+         libellé de page, juste à côté. #}
+      <div class="dropdown app-topbar__brand">
+        <button type="button" class="app-topbar__mark" id="brandMenu" data-bs-toggle="dropdown"
+          aria-expanded="false" aria-label="Compte et réglages" title="{{ _app_name }}">
           {% if _logo_global %}
           <img src="{{ _logo_global | app_path }}" alt="">
           {% else %}
-          <i class="bi bi-box-seam" aria-hidden="true"></i>
+          <span class="app-topbar__initials">{{ _initiales }}</span>
           {% endif %}
-        </span>
-        <span class="app-topbar__brand-name">{{ _app_name }}</span>
-      </a>
-
-      {# Sur écran étroit la barre horizontale ne tient pas : elle devient un
-         panneau dépliant, ouvert par ce bouton. #}
-      <button type="button" class="app-topbar__burger" id="navBurger" aria-controls="appMobnav"
-        aria-expanded="false" aria-label="Afficher la navigation">
-        <i class="bi bi-list" aria-hidden="true"></i>
-      </button>
-
-      <nav class="app-topnav" aria-label="Navigation principale">
-        <a class="app-topnav__link app-topnav__home" href="{{ URL_PREFIX }}/" title="Tableau de bord"
-          {% if is_current('/', true) %}aria-current="page" {% endif %}>
-          <i class="bi bi-grid-1x2" aria-hidden="true"></i><span class="app-topnav__label">Tableau de bord</span>
-        </a>
-
-        {% for group in nav_groups %}
-        {% if (not group.feature or plan_has(group.feature))
-              and (not group.metier or metier(group.metier)) %}
-        {% set _items = group['items'] | nav_visibles %}
-        {% if _items %}
-        {% set has_current = is_current_any(*_items | map(attribute='path') | list) %}
-        <div class="app-topnav__group{{ ' admin-only' if group['admin'] else '' }}"
-          {% if group['admin'] and not _nav_user.is_admin %}style="display: none;" {% endif %}>
-          {# Contrairement à la barre latérale, un menu déroulant part toujours
-             fermé : `data-contains-current` ne sert plus qu'à souligner le
-             groupe auquel appartient la page affichée. #}
-          <button type="button" class="app-topnav__toggle" data-nav-toggle
-            title="{{ group['label'] }}"
-            aria-expanded="false" aria-controls="grp-{{ group['key'] }}"
-            {% if has_current %}data-contains-current="true" {% endif %}>
-            <i class="bi {{ group['icon'] }}" aria-hidden="true"></i>
-            <span class="app-topnav__label">{{ group['label'] }}</span>
-            <i class="bi bi-chevron-down app-topnav__chevron" aria-hidden="true"></i>
-          </button>
-          <ul class="app-topnav__panel" id="grp-{{ group['key'] }}" hidden>
-            {% for item in _items %}
-            <li>
-              <a class="app-topnav__item" href="{{ URL_PREFIX }}{{ item['path'] }}"
-                {% if is_current(item['path'], item['exact']) %}aria-current="page" {% endif %}>
-                <i class="bi {{ item['icon'] }}" aria-hidden="true"></i><span>{{ item['label'] }}</span>
-              </a>
-            </li>
-            {% endfor %}
-            {% if group['key'] == 'boutique' %}
-            <li>
-              {# La vitrine est une autre application : son URL ne prend pas le préfixe. #}
-              <a class="app-topnav__item" href="/e-commerce" target="_blank" rel="noopener">
-                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span>Voir le site</span>
-              </a>
-            </li>
-            {% endif %}
-          </ul>
-        </div>
-        {% endif %}{# _items #}
-        {% endif %}{# groupe visible #}
-        {% endfor %}
-
-      </nav>
-
-      <!-- Recherche unifiée (clients + produits) -->
-      <div class="navbar-search-wrapper" id="navSearchContainer">
-        <div class="navbar-search-group">
-          <span class="navbar-search-icon">
-            <i class="bi bi-search" aria-hidden="true"></i>
-          </span>
-          <input type="text" class="form-control bg-transparent border-0 shadow-none navbar-search-input"
-            placeholder="Rechercher…" id="navUnifiedSearch" autocomplete="off">
-          <span class="navbar-search-kbd" aria-hidden="true">/</span>
-        </div>
-        <!-- Résultats -->
-        <div class="dropdown-menu mt-2 py-0 overflow-hidden" id="navUnifiedDropdown"
-          style="width: 340px; right: 0; left: auto; max-height: 500px; display: none; z-index: 1050;">
-          <div class="d-flex border-bottom bg-light small fw-bold text-muted">
-            <div class="px-3 py-2 flex-grow-1">Résultats</div>
-            <div class="px-3 py-2 text-end" id="searchLoading" style="display:none;">
-              <span class="spinner-border spinner-border-sm" role="status"></span>
-            </div>
-          </div>
-          <div id="navUnifiedResults" class="list-group list-group-flush"
-            style="max-height: 400px; overflow-y: auto;"></div>
-        </div>
-      </div>
-
-      <a class="app-topbar__icon-btn" href="{{ URL_PREFIX }}/settings" aria-label="Paramètres" title="Paramètres"
-        {% if is_current('/settings') %}aria-current="page" {% endif %}>
-        <i class="bi bi-gear" aria-hidden="true"></i>
-      </a>
-
-      <button class="app-topbar__icon-btn" type="button" id="themeToggle" aria-label="Changer de thème"
-        title="Changer de thème">
-        <i class="bi bi-moon-stars theme-toggle__dark" aria-hidden="true"></i>
-        <i class="bi bi-sun theme-toggle__light" aria-hidden="true"></i>
-      </button>
-
-      <div class="dropdown">
-        <button type="button" class="app-topbar__account" data-bs-toggle="dropdown" aria-expanded="false"
-          aria-label="Mon compte">
-          <span class="app-topbar__avatar" aria-hidden="true"><i class="bi bi-person"></i></span>
         </button>
-        <ul class="dropdown-menu dropdown-menu-end">
+        <ul class="dropdown-menu" aria-labelledby="brandMenu">
           {# `username` est le crochet attendu par `auth.js` (displayUserInfo).
              Le rôle porte un identifiant préfixé : l'écran Paramètres a déjà un
              `<select id="userRole">`, et un doublon ferait pointer
@@ -345,6 +260,153 @@
         </ul>
       </div>
 
+      {# `themeToggle` reste l'identifiant écouté par le script : le bouton a
+         changé de place, pas de nom. #}
+      <button type="button" class="app-topbar__icon-btn" id="themeToggle"
+        aria-label="Changer de thème" title="Changer de thème">
+        <i class="bi bi-moon-stars theme-toggle__dark" aria-hidden="true"></i>
+        <i class="bi bi-sun theme-toggle__light" aria-hidden="true"></i>
+      </button>
+
+      <span class="app-topbar__divider" aria-hidden="true"></span>
+
+      {# Repère de position, à la place du fil d'Ariane parti avec la barre
+         latérale : le libellé de la page affichée, retrouvé dans `nav_groups`
+         plutôt que redéclaré par chaque écran. Le tableau de bord est le repli,
+         c'est aussi la seule page hors groupes. #}
+      {% set _courant = namespace(label='Tableau de bord', icon='bi-grid-1x2') %}
+      {% for group in nav_groups %}{% for item in group['items'] %}
+      {% if is_current(item['path'], item['exact']) %}
+      {% set _courant.label = item['label'] %}{% set _courant.icon = item['icon'] %}
+      {% endif %}{% endfor %}{% endfor %}
+      {# Écrans qui n'appartiennent à aucun groupe : ils resteraient autrement
+         étiquetés « Tableau de bord ». Consultée APRÈS la boucle, cette table
+         l'emporte à dessein — `/clients/debts` doit annoncer les créances, pas
+         le groupe Clients dont son chemin prolonge l'entrée. #}
+      {% for chemin, libelle, icone in [
+        ('/daily-sales', 'Ventes du jour', 'bi-cart-check'),
+        ('/daily-requests', 'Demandes du jour', 'bi-chat-left-text'),
+        ('/delivery-notes', 'Bons de livraison', 'bi-truck'),
+        ('/bank-transactions', 'Transactions bancaires', 'bi-bank'),
+        ('/clients/debts', 'Créances clients', 'bi-cash-stack'),
+        ('/clients/detail', 'Fiche client', 'bi-person-lines-fill'),
+        ('/google-sheets-sync', 'Google Sheets', 'bi-file-earmark-spreadsheet'),
+        ('/migration-manager', 'Migrations', 'bi-arrow-repeat'),
+        ('/cache-manager', 'Cache', 'bi-hdd'),
+        ('/desktop', 'Bureau', 'bi-window-stack'),
+        ('/settings', 'Paramètres', 'bi-gear'),
+        ('/profile', 'Mon profil', 'bi-person-circle')
+      ] %}
+      {% if is_current(chemin) %}
+      {% set _courant.label = libelle %}{% set _courant.icon = icone %}
+      {% endif %}{% endfor %}
+      <a class="app-topbar__current" href="{{ URL_PREFIX }}/" title="Retour au tableau de bord">
+        <i class="bi {{ _courant.icon }}" aria-hidden="true"></i>
+        <span>{{ _courant.label }}</span>
+      </a>
+
+      {# Sur écran étroit la barre horizontale ne tient pas : elle devient un
+         panneau dépliant, ouvert par ce bouton. #}
+      <button type="button" class="app-topbar__burger" id="navBurger" aria-controls="appMobnav"
+        aria-expanded="false" aria-label="Afficher la navigation">
+        <i class="bi bi-list" aria-hidden="true"></i>
+      </button>
+
+      <nav class="app-topnav" aria-label="Navigation principale">
+        <a class="app-topnav__link app-topnav__home" href="{{ URL_PREFIX }}/" title="Tableau de bord"
+          {% if is_current('/', true) %}aria-current="page" {% endif %}>
+          <span class="app-topnav__label">Tableau de bord</span>
+        </a>
+
+        {% for group in nav_groups %}
+        {% if (not group.feature or plan_has(group.feature))
+              and (not group.metier or metier(group.metier)) %}
+        {% set _items = group['items'] | nav_visibles %}
+        {% if _items %}
+        {% set has_current = is_current_any(*_items | map(attribute='path') | list) %}
+        <div class="app-topnav__group{{ ' admin-only' if group['admin'] else '' }}"
+          {% if group['admin'] and not _nav_user.is_admin %}style="display: none;" {% endif %}>
+          {# Contrairement à la barre latérale, un menu déroulant part toujours
+             fermé : `data-contains-current` ne sert plus qu'à souligner le
+             groupe auquel appartient la page affichée. #}
+          <button type="button" class="app-topnav__toggle" data-nav-toggle
+            title="{{ group['label'] }}"
+            aria-expanded="false" aria-controls="grp-{{ group['key'] }}"
+            {% if has_current %}data-contains-current="true" {% endif %}>
+            <span class="app-topnav__label">{{ group['label'] }}</span>
+            <i class="bi bi-chevron-down app-topnav__chevron" aria-hidden="true"></i>
+          </button>
+          <ul class="app-topnav__panel" id="grp-{{ group['key'] }}" hidden>
+            {% set _sect = namespace(courante=None) %}
+            {% for item in _items %}
+            {% if item.get('section') and item['section'] != _sect.courante %}
+            <li class="app-topnav__section">{{ item['section'] }}</li>
+            {% set _sect.courante = item['section'] %}
+            {% endif %}
+            <li>
+              <a class="app-topnav__item" href="{{ URL_PREFIX }}{{ item['path'] }}"
+                {% if is_current(item['path'], item['exact']) %}aria-current="page" {% endif %}>
+                <i class="bi {{ item['icon'] }}" aria-hidden="true"></i><span>{{ item['label'] }}</span>
+              </a>
+            </li>
+            {% endfor %}
+            {% if group['key'] == 'boutique' %}
+            <li>
+              {# La vitrine est une autre application : son URL ne prend pas le préfixe. #}
+              <a class="app-topnav__item" href="/e-commerce" target="_blank" rel="noopener">
+                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span>Voir le site</span>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+        {% endif %}{# _items #}
+        {% endif %}{# groupe visible #}
+        {% endfor %}
+
+      </nav>
+
+      {# Les deux actions du bord droit, réunies : l'enveloppe porte la marge
+         automatique qui les y pousse, sinon l'espace libre se logerait entre
+         elles et la recherche resterait collée à la navigation. #}
+      <div class="app-topbar__actions">
+        <button type="button" class="app-topbar__icon-btn" data-open-search
+          aria-label="Rechercher" title="Rechercher ( / )">
+          <i class="bi bi-search" aria-hidden="true"></i>
+        </button>
+
+        {# L'écran des ventes du jour porte déjà un bouton du même nom : cet
+           appel à l'action l'atteint plutôt que de dupliquer le formulaire. #}
+        <a class="app-topbar__cta" href="{{ URL_PREFIX }}/daily-sales">
+          <i class="bi bi-plus-square" aria-hidden="true"></i>
+          <span>Nouvelle vente</span>
+        </a>
+      </div>
+
+      {# Recherche unifiée (clients + produits). Hors flux : elle descend en
+         surcouche sous la barre à l'appui de « / », et la barre reste épurée. #}
+      <div class="navbar-search-wrapper" id="navSearchContainer" hidden>
+        <div class="navbar-search-group">
+          <span class="navbar-search-icon">
+            <i class="bi bi-search" aria-hidden="true"></i>
+          </span>
+          <input type="text" class="form-control bg-transparent border-0 shadow-none navbar-search-input"
+            placeholder="Rechercher un client, un produit…" id="navUnifiedSearch" autocomplete="off">
+          <span class="navbar-search-kbd" aria-hidden="true">Échap</span>
+        </div>
+        <!-- Résultats -->
+        <div class="dropdown-menu mt-2 py-0 overflow-hidden" id="navUnifiedDropdown"
+          style="width: 340px; right: 0; left: auto; max-height: 500px; display: none; z-index: 1050;">
+          <div class="d-flex border-bottom bg-light small fw-bold text-muted">
+            <div class="px-3 py-2 flex-grow-1">Résultats</div>
+            <div class="px-3 py-2 text-end" id="searchLoading" style="display:none;">
+              <span class="spinner-border spinner-border-sm" role="status"></span>
+            </div>
+          </div>
+          <div id="navUnifiedResults" class="list-group list-group-flush"
+            style="max-height: 400px; overflow-y: auto;"></div>
+        </div>
+      </div>
       <!-- Animée dès qu'une requête est en vol (cf. compteur dans http.js). -->
       <div class="app-progress" id="appProgress" role="status" aria-live="polite"
         aria-label="Chargement en cours"></div>
@@ -378,7 +440,12 @@
           <i class="bi bi-chevron-down app-mobnav__chevron" aria-hidden="true"></i>
         </button>
         <ul class="app-mobnav__panel" id="mgrp-{{ group['key'] }}" {% if not has_current %}hidden{% endif %}>
+          {% set _sect = namespace(courante=None) %}
           {% for item in _items %}
+          {% if item.get('section') and item['section'] != _sect.courante %}
+          <li class="app-mobnav__section">{{ item['section'] }}</li>
+          {% set _sect.courante = item['section'] %}
+          {% endif %}
           <li>
             <a class="app-mobnav__item" href="{{ URL_PREFIX }}{{ item['path'] }}"
               {% if is_current(item['path'], item['exact']) %}aria-current="page" {% endif %}>{{ item['label'] }}</a>
@@ -625,15 +692,47 @@
       const unifiedResults = document.getElementById('navUnifiedResults');
       const searchLoading = document.getElementById('searchLoading');
 
-      // « / » met le focus dans la recherche, sauf si l'on saisit déjà du texte
-      // ailleurs — le rappel est affiché dans le champ.
+      // La recherche a quitté la barre : elle descend en surcouche, ouverte par
+      // « / » ou par l'entrée du menu de la marque. Le champ et sa liste de
+      // résultats sont inchangés — seule leur visibilité est désormais pilotée.
+      const searchBox = document.getElementById('navSearchContainer');
+
+      const openSearch = () => {
+        if (!searchBox) return;
+        searchBox.hidden = false;
+        if (unifiedInput) { unifiedInput.focus(); unifiedInput.select(); }
+      };
+
+      const closeSearch = () => {
+        if (!searchBox || searchBox.hidden) return;
+        searchBox.hidden = true;
+        // La liste de résultats est masquée en propre : laissée ouverte, elle
+        // resurgirait telle quelle à la prochaine ouverture, avec les résultats
+        // d'une recherche précédente.
+        if (unifiedDropdown) unifiedDropdown.style.display = 'none';
+      };
+
+      document.querySelectorAll('[data-open-search]').forEach((bouton) => {
+        bouton.addEventListener('click', (e) => { e.preventDefault(); openSearch(); });
+      });
+
+      // « / » ouvre la recherche, sauf si l'on saisit déjà du texte ailleurs —
+      // le rappel de la touche d'échappement est affiché dans le champ.
       document.addEventListener('keydown', (e) => {
         if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
         const t = e.target;
         const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
         if (typing || !unifiedInput) return;
         e.preventDefault();
-        unifiedInput.focus();
+        openSearch();
+      });
+
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSearch(); });
+
+      document.addEventListener('click', (e) => {
+        if (!searchBox || searchBox.hidden) return;
+        if (e.target.closest('#navSearchContainer') || e.target.closest('[data-open-search]')) return;
+        closeSearch();
       });
 
       // Helper function to escape HTML

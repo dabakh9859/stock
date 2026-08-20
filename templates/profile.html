@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Mon profil - {{ _app_name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .profile-identity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1.75rem 1.25rem;
+  }
+
+  .profile-avatar {
+    display: grid;
+    place-items: center;
+    width: 5rem;
+    height: 5rem;
+    border-radius: 999px;
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .profile-identity__name {
+    margin-block: 0.875rem 0.125rem;
+    font-size: 1.0625rem;
+    font-weight: 600;
+  }
+
+  .profile-identity__username {
+    color: hsl(var(--muted-foreground));
+    font-size: 0.8125rem;
+  }
+
+  /* Repères de compte : deux lignes clé/valeur, séparées d'un filet. */
+  .profile-facts {
+    display: grid;
+    gap: 0.625rem;
+    margin-block-start: 1.25rem;
+    padding-block-start: 1.25rem;
+    border-block-start: 1px solid hsl(var(--border));
+    width: 100%;
+    font-size: 0.8125rem;
+  }
+
+  .profile-facts div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .profile-facts dt { color: hsl(var(--muted-foreground)); font-weight: 400; }
+  .profile-facts dd { margin: 0; font-weight: 500; text-align: end; }
+
+  /* Rappel des règles, sous le champ de nouveau mot de passe. */
+  .profile-rules { list-style: none; margin: 0.5rem 0 0; padding: 0; font-size: 0.8125rem; }
+  .profile-rules li { display: flex; align-items: center; gap: 0.5rem; color: hsl(var(--muted-foreground)); }
+  .profile-rules li[data-ok="true"] { color: hsl(var(--success, 142 71% 45%)); }
+  .profile-rules i { font-size: 0.75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Mon profil</h1>
+    <p class="page-subtitle">Vos informations et votre mot de passe</p>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card">
+      <div class="profile-identity">
+        <span class="profile-avatar" id="profileInitials" aria-hidden="true">–</span>
+        <p class="profile-identity__name" id="profileName">Chargement…</p>
+        <span class="profile-identity__username" id="profileUsername"></span>
+        <span class="badge bg-secondary mt-2" id="profileRole">—</span>
+
+        <dl class="profile-facts">
+          <div>
+            <dt>Compte créé le</dt>
+            <dd id="profileCreated">—</dd>
+          </div>
+          <div>
+            <dt>Dernière connexion</dt>
+            <dd id="profileLastLogin">—</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-header">
+        <h6 class="m-0"><i class="bi bi-person-circle me-2"></i>Informations personnelles</h6>
+      </div>
+      <div class="card-body">
+        <form id="profileForm" novalidate>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="fullName">Nom complet</label>
+              <input type="text" class="form-control" id="fullName" maxlength="120"
+                autocomplete="name" placeholder="Votre nom">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="email">Adresse email</label>
+              <input type="email" class="form-control" id="email"
+                autocomplete="email" placeholder="vous@exemple.com">
+            </div>
+
+            {# Nom de connexion et rôle sont affichés mais non modifiables : ils
+               engagent les droits, et relèvent donc de l'administration. Le
+               serveur ne les lit pas non plus dans cette requête — le verrou est
+               là-bas, celui-ci n'est qu'un rappel. #}
+            <div class="col-md-6">
+              <label class="form-label" for="usernameRO">Nom de connexion</label>
+              <input type="text" class="form-control" id="usernameRO" disabled>
+              <div class="form-text">Modifiable par un administrateur uniquement.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="roleRO">Rôle</label>
+              <input type="text" class="form-control" id="roleRO" disabled>
+              <div class="form-text">Définit vos accès dans l'application.</div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end gap-2 mt-3">
+            <button type="button" class="btn btn-outline-secondary" id="profileReset">Annuler</button>
+            <button type="submit" class="btn btn-primary" id="profileSubmit">
+              <i class="bi bi-check-lg me-1"></i>Enregistrer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h6 class="m-0"><i class="bi bi-shield-lock me-2"></i>Mot de passe</h6>
+      </div>
+      <div class="card-body">
+        <form id="passwordForm" novalidate>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label" for="currentPassword">Mot de passe actuel</label>
+              <input type="password" class="form-control" id="currentPassword"
+                autocomplete="current-password" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="newPassword">Nouveau mot de passe</label>
+              <input type="password" class="form-control" id="newPassword"
+                autocomplete="new-password" required>
+              <ul class="profile-rules">
+                <li data-rule="length"><i class="bi bi-circle"></i><span>8 caractères minimum</span></li>
+                <li data-rule="different"><i class="bi bi-circle"></i><span>Différent de l'actuel</span></li>
+              </ul>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="confirmPassword">Confirmer</label>
+              <input type="password" class="form-control" id="confirmPassword"
+                autocomplete="new-password" required>
+              <ul class="profile-rules">
+                <li data-rule="match"><i class="bi bi-circle"></i><span>Les deux saisies concordent</span></li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
+            <i class="bi bi-info-circle me-1"></i>
+            Changer votre mot de passe ferme vos sessions ouvertes sur les autres
+            appareils. Celle-ci reste active.
+          </div>
+
+          <div class="d-flex justify-content-end mt-3">
+            <button type="submit" class="btn btn-primary" id="passwordSubmit">
+              <i class="bi bi-key me-1"></i>Changer le mot de passe
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/profile.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}
