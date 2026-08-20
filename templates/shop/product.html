@@ -1,0 +1,194 @@
+{% extends "shop/base.html" %}
+
+{% block title %}{{ product.name }} — Stock{% endblock %}
+{% block description %}{{ product.description_text[:160] if product.description_text else product.name }}{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <!-- Fil d'ariane -->
+  <nav class="crumbs">
+    <a href="/e-commerce">Accueil</a>
+    <span class="sep"></span>
+    <a href="/e-commerce/produits">Boutique</a>
+    {% if product.category %}
+    <span class="sep"></span>
+    <a href="/e-commerce/produits?category={{ product.category | urlencode }}">{{ product.category }}</a>
+    {% endif %}
+    <span class="sep"></span>
+    <span class="current">{{ product.name }}</span>
+  </nav>
+
+  <div class="pdp">
+    <!-- Galerie -->
+    <div class="pdp-gallery">
+      <div class="pdp-main" id="pdpMain">
+        {% if product.image_path %}
+        <img src="{{ product.image_path }}" alt="{{ product.name }}" id="pdpMainImg">
+        {% else %}
+        <div class="media-empty">
+          <span>GA</span>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if product.related %}
+      <div class="pdp-thumbs">
+        <button type="button" class="nav" id="thumbPrev" aria-label="Précédent"><i class="bi bi-chevron-left"></i></button>
+        <div class="pdp-thumbs-track" id="thumbTrack"></div>
+        <button type="button" class="nav" id="thumbNext" aria-label="Suivant"><i class="bi bi-chevron-right"></i></button>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Informations -->
+    <div class="pdp-info">
+      <h1>{{ product.name }}</h1>
+
+      <div class="pdp-meta">
+        <span>Réf. {{ product.product_id }}</span>
+        {% if product.brand %}<span>Marque : {{ product.brand }}</span>{% endif %}
+        {% if product.availability == 'épuisé' %}
+        <span class="out">Épuisé</span>
+        {% elif product.availability == 'en stock' %}
+        <span class="in">En stock</span>
+        {% else %}
+        <span class="order">Sur commande</span>
+        {% endif %}
+      </div>
+
+      <div class="pdp-price" id="pdpPrice"></div>
+
+      {% if product.description_html %}
+      <div class="pdp-desc rich">{{ product.description_html | safe }}</div>
+      {% endif %}
+
+      {% if product.availability != 'épuisé' %}
+      <div class="pdp-buy">
+        <div class="qty">
+          <input type="number" id="qtyInput" value="1" min="1" aria-label="Quantité">
+          <div class="qty-steps">
+            <button type="button" id="qtyUp" aria-label="Augmenter"><i class="bi bi-chevron-up"></i></button>
+            <button type="button" id="qtyDown" aria-label="Diminuer"><i class="bi bi-chevron-down"></i></button>
+          </div>
+        </div>
+        <button class="btn-solid" id="addToCartBtn">Ajouter au panier</button>
+      </div>
+      {% else %}
+      <div class="pdp-buy">
+        <button class="btn-outline" disabled>Produit épuisé</button>
+      </div>
+      {% endif %}
+
+      <div class="pdp-actions">
+        <button type="button" data-wish="{{ product.product_id }}"><i class="bi bi-heart"></i> Ajouter aux favoris</button>
+        <button type="button" data-compare="{{ product.product_id }}"><i class="bi bi-arrow-left-right"></i> Comparer</button>
+      </div>
+
+      <ul class="pdp-perks">
+        <li>Matériel testé avant la vente</li>
+        <li>Livraison à Dakar et partout au Sénégal</li>
+        {% if product.availability == 'sur commande' %}
+        <li>Commande possible : notre équipe confirme le délai après validation</li>
+        {% else %}
+        <li>Expédition rapide depuis notre stock</li>
+        {% endif %}
+      </ul>
+
+      <div class="pdp-attrs">
+        {% if product.category %}
+        <div class="pdp-attr"><dt>Rayon</dt>
+          <dd><a href="/e-commerce/produits?category={{ product.category | urlencode }}">{{ product.category }}</a></dd>
+        </div>
+        {% endif %}
+        {% if product.brand %}
+        <div class="pdp-attr"><dt>Marque</dt><dd>{{ product.brand }}</dd></div>
+        {% endif %}
+        {% if product.model %}
+        <div class="pdp-attr"><dt>Modèle</dt><dd>{{ product.model }}</dd></div>
+        {% endif %}
+        {% if product.condition %}
+        <div class="pdp-attr"><dt>État</dt><dd>{{ product.condition }}</dd></div>
+        {% endif %}
+      </div>
+
+      <div class="pdp-note">
+        <i class="bi bi-info-square"></i>
+        <div>
+          Horaires : lundi – samedi, 09:00 – 20:00<br>
+          Une question sur ce produit ? Écrivez-nous, on vous répond.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if product.related %}
+<section class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Dans le même rayon</h2>
+      <a href="/e-commerce/produits?category={{ product.category | urlencode }}" class="link-arrow">
+        Tout voir <i class="bi bi-caret-right-fill"></i>
+      </a>
+    </div>
+    <div class="pgrid cols-4" id="relatedGrid"></div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const PRODUCT = {{ product_json | safe }};
+  const RELATED = {{ related_json | safe }};
+
+  document.getElementById('pdpPrice').innerHTML = priceLabel(PRODUCT);
+  cacheProducts([PRODUCT].concat(RELATED));
+
+  /* ---------------------------------------------------------- quantité */
+  const qtyInput = document.getElementById('qtyInput');
+  const up = document.getElementById('qtyUp');
+  const down = document.getElementById('qtyDown');
+
+  if (up) up.addEventListener('click', () => { qtyInput.value = Number(qtyInput.value || 1) + 1; });
+  if (down) down.addEventListener('click', () => {
+    qtyInput.value = Math.max(1, Number(qtyInput.value || 1) - 1);
+  });
+
+  const addBtn = document.getElementById('addToCartBtn');
+  if (addBtn) {
+    addBtn.addEventListener('click', () => {
+      const quantity = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+      if (addToCart(PRODUCT, quantity)) {
+        addBtn.textContent = 'Ajouté au panier';
+        setTimeout(() => { addBtn.textContent = 'Ajouter au panier'; }, 1800);
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------- vignettes */
+  /* Le stock ne stocke qu'une image par produit: les vignettes présentent
+     les produits du même rayon plutôt qu'une fausse galerie. */
+  const track = document.getElementById('thumbTrack');
+  if (track && RELATED.length) {
+    track.innerHTML = RELATED.map((item) => `
+      <a href="/e-commerce/produit/${item.product_id}" class="pdp-thumb" title="${attr(item.name)}">
+        ${item.image_path
+          ? `<img src="${attr(item.image_path)}" alt="${attr(item.name)}">`
+          : '<i class="bi bi-box-seam" style="color:var(--text-dim)"></i>'}
+      </a>`).join('');
+
+    const prev = document.getElementById('thumbPrev');
+    const next = document.getElementById('thumbNext');
+    if (prev) prev.addEventListener('click', () => track.scrollBy({ left: -190, behavior: 'smooth' }));
+    if (next) next.addEventListener('click', () => track.scrollBy({ left: 190, behavior: 'smooth' }));
+  }
+
+  /* ---------------------------------------------------------- même rayon */
+  const relatedGrid = document.getElementById('relatedGrid');
+  if (relatedGrid && RELATED.length) {
+    relatedGrid.innerHTML = RELATED.map(productCard).join('');
+    initReveal();
+  }
+</script>
+{% endblock %}

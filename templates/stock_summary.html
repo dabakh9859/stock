@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Récapitulatif de Stock - Stock{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Récapitulatif de stock</h1>
+        <p class="page-subtitle">Valorisation du stock et bénéfice potentiel</p>
+    </div>
+    <div class="page-header__actions">
+        <a href="{{ URL_PREFIX }}/stock-movements" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>Retour aux mouvements
+        </a>
+    </div>
+</div>
+
+<!-- Résumé général -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="v3-stat v3-stat--brand h-100">
+            <span class="v3-stat__label">Valeur du stock</span>
+            <span class="v3-stat__value" id="totalStockValue">0 F CFA</span>
+            <span class="v3-stat__hint">Valeur totale en vente</span>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="v3-stat v3-stat--success h-100">
+            <span class="v3-stat__label">Bénéfice potentiel</span>
+            <span class="v3-stat__value" id="totalProfit">0 F CFA</span>
+            <span class="v3-stat__hint">Bénéfice réalisable</span>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="v3-stat v3-stat--info h-100">
+            <span class="v3-stat__label">Coût d'achat</span>
+            <span class="v3-stat__value" id="totalPurchaseCost">0 F CFA</span>
+            <span class="v3-stat__hint">Coût total d'achat</span>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="v3-stat v3-stat--warn h-100">
+            <span class="v3-stat__label">Marge bénéficiaire</span>
+            <span class="v3-stat__value" id="profitMargin">0%</span>
+            <span class="v3-stat__hint">Marge en pourcentage</span>
+        </div>
+    </div>
+</div>
+
+<!-- Statistiques produits -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-md-4">
+        <div class="v3-stat h-100">
+            <span class="v3-stat__label">Total produits</span>
+            <span class="v3-stat__value" id="totalProducts">0</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="v3-stat v3-stat--success h-100">
+            <span class="v3-stat__label">En stock</span>
+            <span class="v3-stat__value" id="productsWithStock">0</span>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="v3-stat v3-stat--danger h-100">
+            <span class="v3-stat__label">Rupture de stock</span>
+            <span class="v3-stat__value" id="productsOutOfStock">0</span>
+        </div>
+    </div>
+</div>
+
+<!-- Détail par catégorie -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Détail par catégorie</h6>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Catégorie</th>
+                                <th>Nombre de Produits</th>
+                                <th>Quantité</th>
+                                <th>Valeur Stock</th>
+                                <th>Bénéfice Potentiel</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categoryTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Chargement...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/stock_summary.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}

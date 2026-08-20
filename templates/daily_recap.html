@@ -1,0 +1,673 @@
+{% extends "base.html" %}
+
+{% block title %}Récapitulatif - {{ _app_name }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  /* Boutons de tranche prédéfinie : segments d'un même sélecteur, dans la
+     piste grise des onglets. */
+  .range-presets {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.125rem;
+    padding: 0.1875rem;
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius);
+  }
+
+  .range-preset {
+    border: none;
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.3125rem 0.6875rem;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .range-preset:hover { color: hsl(var(--foreground)); }
+
+  /* Sélecteur de tranche : segments plus épais et libres de passer à la ligne. */
+  @media (max-width: 767.98px) {
+    .range-presets { width: 100%; }
+    .range-preset { flex: 1 1 auto; padding: 0.5rem 0.625rem; text-align: center; }
+  }
+
+
+  .range-preset[aria-pressed="true"] {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Le graphe de la tranche ne s'affiche que si elle couvre plusieurs jours. */
+  .range-chart { height: 260px; }
+
+  /* Les blocs qui ne dépendent pas de la tranche portent ce repère : sans lui,
+     on lirait « créances : 2,2 M » comme un montant de la période. */
+  .as-of-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: 999px;
+    padding: 0.125rem 0.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Récapitulatif</h1>
+    <p class="page-subtitle" id="rangeSubtitle">Chargement…</p>
+  </div>
+  <div class="page-header__actions">
+    <button class="btn btn-outline-secondary" id="rangeRefresh" title="Recharger la tranche">
+      <i class="bi bi-arrow-clockwise me-2"></i>Actualiser
+    </button>
+  </div>
+</div>
+
+<!-- Sélecteur de tranche : pilote toute la page -->
+<div class="v3-toolbar">
+  <div class="d-flex flex-wrap align-items-end gap-3">
+    <div class="range-presets" role="group" aria-label="Tranches prédéfinies">
+      <button type="button" class="range-preset" data-preset="today">Aujourd'hui</button>
+      <button type="button" class="range-preset" data-preset="yesterday">Hier</button>
+      <button type="button" class="range-preset" data-preset="7d">7 jours</button>
+      <button type="button" class="range-preset" data-preset="30d">30 jours</button>
+      <button type="button" class="range-preset" data-preset="month">Ce mois</button>
+      <button type="button" class="range-preset" data-preset="lastmonth">Mois dernier</button>
+      <button type="button" class="range-preset" data-preset="year">Cette année</button>
+    </div>
+
+    <div class="d-flex align-items-end gap-2 ms-auto">
+      <div>
+        <label for="rangeStart" class="form-label">Du</label>
+        <input type="date" class="form-control" id="rangeStart">
+      </div>
+      <div>
+        <label for="rangeEnd" class="form-label">Au</label>
+        <input type="date" class="form-control" id="rangeEnd">
+      </div>
+      <button class="btn btn-primary" id="rangeApply">
+        <i class="bi bi-check2 me-2"></i>Appliquer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Caisse sur la tranche -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Encaissements</span>
+      <span class="v3-stat__value v3-stat--success" id="paymentsReceived">0 F CFA</span>
+      <span class="v3-stat__hint" id="paymentsReceivedAvg"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Entrées banque</span>
+      <span class="v3-stat__value" id="bankEntries">0 F CFA</span>
+      <span class="v3-stat__hint" id="bankEntriesCount"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Sorties banque</span>
+      <span class="v3-stat__value" id="bankExits">0 F CFA</span>
+      <span class="v3-stat__hint" id="bankExitsCount"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Solde de la période</span>
+      <span class="v3-stat__value" id="periodBalance">0 F CFA</span>
+      <span class="v3-stat__hint">Encaissé + banque − sorties − achats</span>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Achats quotidiens</span>
+      <span class="v3-stat__value" id="dailyPurchasesOut">0 F CFA</span>
+      <span class="v3-stat__hint" id="dailyPurchasesAvg"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">CA facturé</span>
+      <span class="v3-stat__value" id="potentialRevenue">0 F CFA</span>
+      <span class="v3-stat__hint" id="potentialRevenueAvg"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">CA net encaissé</span>
+      <span class="v3-stat__value" id="netRevenue">0 F CFA</span>
+      <span class="v3-stat__hint">Encaissé − achats quotidiens</span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Bénéfice externe</span>
+      <span class="v3-stat__value" id="externalProfit">0 F CFA</span>
+      <span class="v3-stat__hint">Sur les factures de la période</span>
+    </div>
+  </div>
+</div>
+
+<!-- Évolution jour par jour -->
+<div class="card mb-4" id="rangeChartCard">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0">Évolution sur la période</h6>
+    <span class="text-muted" style="font-size: 0.75rem;" id="bestDayLabel"></span>
+  </div>
+  <div class="card-body">
+    <div class="range-chart"><canvas id="rangeChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Volumes de la période -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Factures créées</span>
+      <span class="v3-stat__value" id="invoicesCreated">0</span>
+      <span class="v3-stat__hint" id="invoicesCreatedAvg"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Devis créés</span>
+      <span class="v3-stat__value" id="quotationsCreated">0</span>
+      <span class="v3-stat__hint" id="quotationsAccepted"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Entrées de stock</span>
+      <span class="v3-stat__value" id="stockEntries">0</span>
+      <span class="v3-stat__hint" id="stockEntriesQty"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Sorties de stock</span>
+      <span class="v3-stat__value" id="stockExits">0</span>
+      <span class="v3-stat__hint" id="stockExitsQty"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Mes statistiques sur la tranche -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0">Mes statistiques <span class="text-muted fw-normal" id="userStatsUsername"></span></h6>
+    <span class="badge bg-secondary badge-plain" id="userNetBalance">0 F CFA</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-xl-3">
+        <div class="v3-stat h-100">
+          <span class="v3-stat__label">Mes factures</span>
+          <span class="v3-stat__value" id="userInvoicesCount">0</span>
+          <span class="v3-stat__hint" id="userInvoicesTotal">0 F CFA</span>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="v3-stat h-100">
+          <span class="v3-stat__label">Mes devis</span>
+          <span class="v3-stat__value" id="userQuotationsCount">0</span>
+          <span class="v3-stat__hint" id="userQuotationsTotal">0 F CFA</span>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="v3-stat h-100">
+          <span class="v3-stat__label">Encaissé par moi</span>
+          <span class="v3-stat__value" id="userPaymentsTotal">0 F CFA</span>
+          <span class="v3-stat__hint" id="userPaymentsCount">0 paiement(s)</span>
+        </div>
+      </div>
+      <div class="col-6 col-xl-3">
+        <div class="v3-stat h-100">
+          <span class="v3-stat__label">Mes achats</span>
+          <span class="v3-stat__value" id="userPurchasesTotal">0 F CFA</span>
+          <span class="v3-stat__hint" id="userPurchasesCount">0 achat(s)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-6">
+        <div class="eyebrow mb-2">Mes factures</div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>N°</th>
+                <th>Client</th>
+                <th class="text-end">Montant</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody id="userInvoicesTable"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="eyebrow mb-2">Mes devis</div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>N°</th>
+                <th>Client</th>
+                <th class="text-end">Montant</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody id="userQuotationsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Achats quotidiens -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0">Achats quotidiens</h6>
+    <span class="fw-semibold" id="dailyPurchasesTotal">0 F CFA</span>
+  </div>
+  <div class="card-body pb-0">
+    <div id="dailyPurchasesByCategory" class="d-flex flex-wrap gap-2 mb-3"></div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Heure</th>
+            <th>Catégorie</th>
+            <th>Description</th>
+            <th class="text-end">Montant</th>
+            <th>Méthode</th>
+            <th>Référence</th>
+          </tr>
+        </thead>
+        <tbody id="dailyPurchasesTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Détails de la période -->
+<div class="row g-4 mb-4">
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Factures créées</h6>
+        <span class="badge bg-secondary badge-plain" id="invoicesTableCount">0</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>N°</th>
+                <th>Client</th>
+                <th class="text-end">Montant</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody id="invoicesTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Paiements encaissés</h6>
+        <span class="badge bg-secondary badge-plain" id="paymentsTableCount">0</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Facture</th>
+                <th class="text-end">Montant</th>
+                <th>Mode</th>
+              </tr>
+            </thead>
+            <tbody id="paymentsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Devis créés</h6>
+        <span class="badge bg-secondary badge-plain" id="quotationsTableCount">0</span>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>N°</th>
+                <th>Client</th>
+                <th class="text-end">Montant</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody id="quotationsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Mouvements de stock</h6>
+        <ul class="nav nav-tabs" id="stockTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="entries-tab" data-bs-toggle="tab" data-bs-target="#entries"
+              type="button" role="tab">Entrées</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="exits-tab" data-bs-toggle="tab" data-bs-target="#exits" type="button"
+              role="tab">Sorties</button>
+          </li>
+        </ul>
+      </div>
+      <div class="card-body p-0">
+        <div class="tab-content" id="stockTabContent">
+          <div class="tab-pane fade show active" id="entries" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Produit</th>
+                    <th class="text-end">Qté</th>
+                    <th>Référence</th>
+                  </tr>
+                </thead>
+                <tbody id="stockEntriesTable"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="tab-pane fade" id="exits" role="tabpanel">
+            <div class="table-responsive">
+              <table class="table table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Produit</th>
+                    <th class="text-end">Qté</th>
+                    <th>Référence</th>
+                  </tr>
+                </thead>
+                <tbody id="stockExitsTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Entrées bancaires</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Motif</th>
+                <th class="text-end">Montant</th>
+                <th>Méthode</th>
+              </tr>
+            </thead>
+            <tbody id="bankEntriesTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Sorties bancaires</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Motif</th>
+                <th class="text-end">Montant</th>
+                <th>Méthode</th>
+              </tr>
+            </thead>
+            <tbody id="bankExitsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{#
+  Tout ce qui suit est un état instantané, pas un cumul de la tranche : les
+  créances, le stock et les indicateurs du tableau de bord valent à l'instant de
+  l'affichage. Le repère « à date » l'annonce, sinon on lirait ces montants
+  comme ceux de la période.
+#}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h2 class="h6 mb-0">État à date</h2>
+  <span class="as-of-flag"><i class="bi bi-clock-history"></i>Indépendant de la période</span>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Créances clients</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Créances clients</span>
+              <span class="v3-stat__value" id="debtsClientRemaining">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Dettes fournisseurs</span>
+              <span class="v3-stat__value" id="debtsSupplierRemaining">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Total restant</span>
+              <span class="v3-stat__value" id="debtsTotalRemaining">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Échu</span>
+              <span class="v3-stat__value" id="debtsOverdueAmount">-</span>
+              <span class="v3-stat__hint" id="debtsOverdueCount">- dettes</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Stock</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Valeur du stock</span>
+              <span class="v3-stat__value" id="recapStockValue">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Bénéfice potentiel</span>
+              <span class="v3-stat__value" id="recapStockProfit">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Coût d'achat</span>
+              <span class="v3-stat__value" id="recapStockCost">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Marge</span>
+              <span class="v3-stat__value" id="recapStockMargin">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Produits</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-4">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">En stock</span>
+              <span class="v3-stat__value" id="dashboardTotalStock">-</span>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Critique</span>
+              <span class="v3-stat__value" id="dashboardCriticalStock">-</span>
+            </div>
+          </div>
+          <div class="col-4">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Rupture</span>
+              <span class="v3-stat__value" id="dashboardOutOfStock">-</span>
+            </div>
+          </div>
+        </div>
+        <div class="eyebrow mb-2">Top produits (CA)</div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Produit</th>
+                <th class="text-end">CA</th>
+              </tr>
+            </thead>
+            <tbody id="topProductsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Indicateurs</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">CA du mois</span>
+              <span class="v3-stat__value" id="dashboardMonthlyRevenue">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Impayé</span>
+              <span class="v3-stat__value" id="dashboardUnpaidAmount">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Panier moyen</span>
+              <span class="v3-stat__value" id="dashboardAvgTicket">-</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Taux conversion</span>
+              <span class="v3-stat__value" id="dashboardConversionRate">-</span>
+            </div>
+          </div>
+        </div>
+        <div class="eyebrow mb-2">Répartition des paiements</div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Méthode</th>
+                <th class="text-end">Montant</th>
+              </tr>
+            </thead>
+            <tbody id="paymentMethodsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/daily_recap.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}

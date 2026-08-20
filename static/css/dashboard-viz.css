@@ -1,0 +1,360 @@
+/* ==========================================================================
+   Tableau de bord — jetons de visualisation
+   --------------------------------------------------------------------------
+   Les couleurs ci-dessous ne sont pas choisies à l'œil. Elles ont été passées
+   au validateur de palette contre les surfaces réelles de l'application
+   (#ffffff en clair, #0d0d0f en sombre) et franchissent les cinq contrôles :
+   bande de clarté, plancher de chroma, séparation en vision des couleurs
+   déficiente, plancher en vision normale, contraste avec la surface.
+
+     · catégoriel bleu+orange : ΔE 33,6 en clair / 31,8 en sombre (plancher 15)
+     · rampe ordinale bleue   : clarté monotone, écarts ≥ 0,06, extrémité claire
+                                à 2,11:1 en clair / 2,40:1 en sombre
+
+   Le mode sombre n'est pas une inversion automatique : ce sont les mêmes
+   teintes, redécoupées pour la surface sombre, puis revalidées.
+   ========================================================================== */
+
+.viz {
+  color-scheme: light;
+
+  --viz-surface: #ffffff;
+
+  /* Catégoriel — deux séries seulement : facturé / encaissé. */
+  --viz-s1: #2a78d6;
+  --viz-s2: #eb6834;
+
+  /* Rampe ordinale — ancienneté des créances. Plus c'est vieux, plus c'est sombre. */
+  --viz-o1: #86b6ef;
+  --viz-o2: #5598e7;
+  --viz-o3: #2a78d6;
+  --viz-o4: #184f95;
+
+  /* Statuts — jamais réutilisés pour une série, toujours avec icône + libellé. */
+  --viz-good: #0ca30c;
+  --viz-warning: #fab219;
+  --viz-critical: #d03b3b;
+
+  /* Chrome : tout ce qui n'est pas la donnée reste en retrait. */
+  --viz-grid: #e1e0d9;
+  --viz-axis: #c3c2b7;
+  --viz-muted: #898781;
+  --viz-ink: #0b0b0b;
+  --viz-ink-2: #52514e;
+
+  /* Surface de l'infobulle — délibérément distincte de celle de la carte.
+     Lui donner la couleur de la carte la rendait invisible : sans ombre ni
+     filet marqué, on ne voyait plus qu'un texte flottant au-dessus des
+     courbes, illisible dès qu'il les croisait. */
+  --viz-tip-bg: #ffffff;
+  --viz-tip-border: #949389;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz {
+    color-scheme: dark;
+    --viz-surface: #0d0d0f;
+    --viz-s1: #3987e5;
+    --viz-s2: #d95926;
+    /* Sur fond sombre, « plus » se lit plus clair : la rampe s'inverse. */
+    --viz-o1: #184f95;
+    --viz-o2: #2a78d6;
+    --viz-o3: #5598e7;
+    --viz-o4: #9ec5f4;
+    --viz-grid: #2c2c2a;
+    --viz-axis: #383835;
+    --viz-muted: #898781;
+    --viz-ink: #ffffff;
+    --viz-ink-2: #c3c2b7;
+    --viz-tip-bg: #2a2a34;
+    --viz-tip-border: #5f5f6b;
+  }
+}
+
+:root[data-theme="dark"] .viz {
+  color-scheme: dark;
+  --viz-surface: #0d0d0f;
+  --viz-s1: #3987e5;
+  --viz-s2: #d95926;
+  --viz-o1: #184f95;
+  --viz-o2: #2a78d6;
+  --viz-o3: #5598e7;
+  --viz-o4: #9ec5f4;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-muted: #898781;
+  --viz-ink: #ffffff;
+  --viz-ink-2: #c3c2b7;
+  --viz-tip-bg: #2a2a34;
+  --viz-tip-border: #5f5f6b;
+}
+
+
+/* --- Barre de filtres : une seule rangée, au-dessus de tout ce qu'elle porte -- */
+
+.viz-filtres {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.viz-filtres__presets {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.65rem;
+}
+
+.viz-preset {
+  border: 0;
+  background: transparent;
+  color: var(--viz-ink-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.45rem;
+  cursor: pointer;
+}
+
+.viz-preset:hover { background: hsl(var(--muted) / 0.6); }
+
+.viz-preset[aria-pressed="true"] {
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+/* Pendant un rechargement, la vue garde son rendu précédent en retrait : ni
+   squelette, ni saut de mise en page. */
+.viz-charge { opacity: 0.55; transition: opacity 0.15s ease; }
+
+
+/* --- Chiffre d'appel et tuiles ------------------------------------------- */
+
+.viz-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1.25rem;
+  margin-bottom: 0.35rem;
+}
+
+/* Chiffres proportionnels : `tabular-nums` donne à chaque chiffre la largeur
+   d'un zéro, ce qui fait paraître un grand nombre distendu. */
+.viz-hero__valeur {
+  font-size: clamp(2.5rem, 6vw, 3.5rem);
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--viz-ink);
+}
+
+.viz-hero__libelle {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--viz-muted);
+}
+
+.viz-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.viz-delta--hausse { color: var(--viz-good); }
+.viz-delta--baisse { color: var(--viz-critical); }
+.viz-delta--neutre { color: var(--viz-muted); }
+
+.viz-tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+.viz-tuile {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: hsl(var(--card));
+}
+
+.viz-tuile__libelle {
+  font-size: 0.75rem;
+  color: var(--viz-muted);
+  margin-bottom: 0.35rem;
+}
+
+.viz-tuile__valeur {
+  font-size: 1.375rem;
+  font-weight: 620;
+  color: var(--viz-ink);
+  line-height: 1.15;
+}
+
+.viz-tuile__pied {
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--viz-muted);
+}
+
+
+/* --- Cartes de graphique -------------------------------------------------- */
+
+.viz-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 1rem;
+}
+
+.viz-grille--large { grid-template-columns: 1fr; }
+
+.viz-carte {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.85rem;
+  background: hsl(var(--card));
+  padding: 1.1rem 1.2rem 1.2rem;
+  min-width: 0;                       /* sinon un canevas large déborde la grille */
+}
+
+.viz-carte__titre {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--viz-ink);
+  margin: 0;
+}
+
+.viz-carte__sous-titre {
+  font-size: 0.8125rem;
+  color: var(--viz-muted);
+  margin: 0.15rem 0 0.9rem;
+}
+
+/* La hauteur inclut la bande des étiquettes d'axe : un cadre calé sur le seul
+   tracé ferait apparaître un petit défilement vertical dans la carte. */
+.viz-toile { position: relative; height: 260px; }
+.viz-toile--haute { height: 320px; }
+
+
+/* --- Répartition en barre empilée (statuts d'encaissement) ---------------- */
+
+.viz-barre {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  gap: 2px;                          /* l'écart de surface sépare, pas un trait */
+  background: transparent;
+}
+
+.viz-barre__part { height: 100%; border-radius: 2px; }
+.viz-barre__part--payee { background: var(--viz-good); }
+.viz-barre__part--partielle { background: var(--viz-warning); }
+.viz-barre__part--attente { background: var(--viz-critical); }
+.viz-barre__part--autre { background: var(--viz-muted); }
+
+.viz-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin-top: 0.85rem;
+}
+
+.viz-legende__item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8125rem;
+  color: var(--viz-ink-2);           /* le texte ne porte jamais la couleur de série */
+}
+
+.viz-legende__cle {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.viz-legende__valeur {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  color: var(--viz-ink);
+  font-weight: 600;
+}
+
+
+/* --- Carte d'activité (jour × heure) -------------------------------------- */
+
+.viz-heat {
+  display: grid;
+  grid-template-columns: auto repeat(var(--viz-heat-cols, 13), minmax(0, 1fr));
+  gap: 3px;
+  align-items: center;
+}
+
+.viz-heat__jour,
+.viz-heat__heure {
+  font-size: 0.6875rem;
+  color: var(--viz-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.viz-heat__jour { padding-right: 0.4rem; text-align: right; }
+.viz-heat__heure { text-align: center; }
+
+.viz-heat__cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--viz-cell, transparent);
+  border: 1px solid hsl(var(--border) / 0.5);
+  cursor: default;
+  min-height: 14px;
+}
+
+.viz-heat__cell:focus-visible {
+  outline: 2px solid var(--viz-s1);
+  outline-offset: 1px;
+}
+
+
+/* --- Vue tableau : tout ce qu'un graphique montre reste lisible sans lui --- */
+
+.viz-tableau { margin-top: 0.9rem; }
+
+.viz-tableau > summary {
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--viz-muted);
+  list-style: none;
+}
+
+.viz-tableau > summary::-webkit-details-marker { display: none; }
+.viz-tableau > summary::before { content: "▸ "; }
+.viz-tableau[open] > summary::before { content: "▾ "; }
+
+.viz-tableau table {
+  width: 100%;
+  margin-top: 0.6rem;
+  font-size: 0.8125rem;
+  border-collapse: collapse;
+}
+
+.viz-tableau th,
+.viz-tableau td {
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+  text-align: left;
+  color: var(--viz-ink-2);
+}
+
+.viz-tableau td:last-child,
+.viz-tableau th:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;   /* colonne de nombres : alignement vertical */
+}

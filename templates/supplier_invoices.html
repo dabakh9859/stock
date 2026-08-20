@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}Factures Fournisseur - Stock{% endblock %}
+
+{% block extra_head %}
+<style>
+    .status-badge {
+        font-size: 0.75rem;
+    }
+
+    .amount-display {
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+    <!-- En-tête -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Factures fournisseur</h1>
+            <p class="page-subtitle">Suivi des achats et des règlements fournisseurs</p>
+        </div>
+        <div class="page-header__actions">
+            <button class="btn btn-primary" onclick="openInvoiceModal()">
+                <i class="bi bi-plus-lg me-2"></i>Nouvelle facture
+            </button>
+        </div>
+    </div>
+
+    <!-- Résumé des statistiques -->
+    <div class="row g-3 mb-4" id="invoiceSummary">
+        <div class="col-6 col-xl-3">
+            <div class="v3-stat v3-stat--brand h-100">
+                <span class="v3-stat__label">Total factures</span>
+                <span class="v3-stat__value" id="totalInvoices">-</span>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="v3-stat v3-stat--warn h-100">
+                <span class="v3-stat__label">En attente</span>
+                <span class="v3-stat__value" id="pendingInvoices">-</span>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="v3-stat h-100">
+                <span class="v3-stat__label">Montant total</span>
+                <span class="v3-stat__value" id="totalAmount">-</span>
+            </div>
+        </div>
+        <div class="col-6 col-xl-3">
+            <div class="v3-stat v3-stat--danger h-100">
+                <span class="v3-stat__label">Montant restant</span>
+                <span class="v3-stat__value" id="remainingAmount">-</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtres et recherche -->
+    <div class="v3-toolbar">
+        <div>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="searchInput" class="form-label">Rechercher</label>
+                    <input type="text" id="searchInput" class="form-control" placeholder="Numéro, fournisseur…">
+                </div>
+                <div class="col-md-3">
+                    <label for="supplierFilter" class="form-label">Fournisseur</label>
+                    <select id="supplierFilter" class="form-select">
+                        <option value="">Tous les fournisseurs</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="statusFilter" class="form-label">Statut</label>
+                    <select id="statusFilter" class="form-select">
+                        <option value="">Tous les statuts</option>
+                        <option value="pending">En attente</option>
+                        <option value="partial">Partiellement payé</option>
+                        <option value="paid">Payé</option>
+                        <option value="overdue">En retard</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Réinitialiser
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des factures -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-list-ul me-2"></i>Liste des factures
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>N° Facture</th>
+                            <th>Fournisseur</th>
+                            <th>Date facture</th>
+                            <th>Date échéance</th>
+                            <th>Montant total</th>
+                            <th>Payé</th>
+                            <th>Restant</th>
+                            <th>Statut</th>
+                            <th>PDF</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoicesTableBody">
+                        <tr>
+                            <td colspan="10" class="text-center py-4">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <nav aria-label="Navigation pagination">
+                <ul class="pagination mb-0" id="pagination"></ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de création/édition de facture -->
+<div class="modal fade" id="invoiceModal" tabindex="-1" aria-labelledby="invoiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="invoiceModalLabel">Nouvelle facture fournisseur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="invoiceForm">
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <!-- Fournisseur -->
+                        <div class="col-md-6">
+                            <label for="supplierSearch" class="form-label">Fournisseur *</label>
+                            <div class="input-group">
+                                <input type="text" id="supplierSearch" class="form-control"
+                                    placeholder="Rechercher ou créer un fournisseur..." autocomplete="off" required>
+                                <button class="btn btn-outline-primary" type="button"
+                                    onclick="openQuickSupplierModal()">
+                                    <i class="bi bi-plus-circle"></i> Nouveau
+                                </button>
+                            </div>
+                            <input type="hidden" id="supplierId" required>
+                            <div id="supplierSearchResults" class="list-group position-absolute w-100"
+                                style="z-index: 1050; max-height: 200px; overflow-y: auto; display: none;"></div>
+                        </div>
+
+                        <!-- Photo de la facture -->
+                        <div class="col-md-6">
+                            <label for="invoiceImage" class="form-label">Photo de la facture</label>
+                            <input type="file" id="invoiceImage" class="form-control" accept="image/*">
+                            <div class="form-text">Téléchargez une photo de la facture fournisseur (optionnel)</div>
+                        </div>
+
+                        <!-- Numéro de facture -->
+                        <div class="col-md-6">
+                            <label for="invoiceNumber" class="form-label">Numéro de facture *</label>
+                            <input type="text" id="invoiceNumber" class="form-control" required>
+                        </div>
+
+                        <!-- Date de facture -->
+                        <div class="col-md-6">
+                            <label for="invoiceDate" class="form-label">Date de facture *</label>
+                            <input type="date" id="invoiceDate" class="form-control" required>
+                        </div>
+
+                        <!-- Date d'échéance -->
+                        <div class="col-md-6">
+                            <label for="dueDate" class="form-label">Date d'échéance</label>
+                            <input type="date" id="dueDate" class="form-control">
+                        </div>
+
+                        <!-- Montant total -->
+                        <div class="col-md-6">
+                            <label for="totalAmount" class="form-label">Montant total (FCFA) *</label>
+                            <input type="number" id="totalAmount" class="form-control bg-light" step="1" min="0"
+                                required readonly style="cursor: not-allowed;">
+                        </div>
+
+                        <!-- Notes -->
+                        <div class="col-12">
+                            <label for="invoiceNotes" class="form-label">Notes</label>
+                            <textarea id="invoiceNotes" class="form-control" rows="2"
+                                placeholder="Notes ou commentaires sur cette facture..."></textarea>
+                        </div>
+
+                        <!-- Section Articles -->
+                        <div class="col-12">
+                            <hr class="my-3">
+                            <h6 class="mb-3"><i class="bi bi-box-seam me-2"></i>Articles de la facture</h6>
+                            <div id="invoiceItemsContainer">
+                                <!-- Les articles seront ajoutés ici dynamiquement -->
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addInvoiceItem()">
+                                <i class="bi bi-plus-circle me-1"></i>Ajouter un article
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span id="saveButtonText">Enregistrer</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de détails de facture -->
+<div class="modal fade" id="invoiceDetailsModal" tabindex="-1" aria-labelledby="invoiceDetailsModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="invoiceDetailsModalLabel">Détails de la facture</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="invoiceDetailsContent">
+                <!-- Le contenu sera rempli dynamiquement -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" id="addPaymentBtn">
+                    <i class="bi bi-credit-card"></i> Ajouter paiement
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de paiement -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentModalLabel">Ajouter un paiement</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="paymentForm">
+                <div class="modal-body">
+                    <div id="paymentInvoiceInfo" class="alert alert-info"></div>
+
+                    <div class="mb-3">
+                        <label for="paymentAmount" class="form-label">Montant *</label>
+                        <input type="number" id="paymentAmount" class="form-control" required step="1" min="0">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentDate" class="form-label">Date de paiement *</label>
+                        <input type="datetime-local" id="paymentDate" class="form-control" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentMethod" class="form-label">Méthode de paiement *</label>
+                        <select id="paymentMethodSelect" class="form-select" required>
+                            <!-- Options remplies dynamiquement depuis les paramètres de méthodes de paiement -->
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentReference" class="form-label">Référence</label>
+                        <input type="text" id="paymentReference" class="form-control">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentNotes" class="form-label">Notes</label>
+                        <textarea id="paymentNotes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-success">Enregistrer paiement</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de création rapide de fournisseur -->
+<div class="modal fade" id="quickSupplierModal" tabindex="-1" aria-labelledby="quickSupplierModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickSupplierModalLabel">Nouveau Fournisseur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="quickSupplierForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="quickSupplierName" class="form-label">Nom du fournisseur *</label>
+                        <input type="text" id="quickSupplierName" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quickSupplierContact" class="form-label">Contact</label>
+                        <input type="text" id="quickSupplierContact" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label for="quickSupplierPhone" class="form-label">Téléphone</label>
+                        <input type="tel" id="quickSupplierPhone" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label for="quickSupplierEmail" class="form-label">Email</label>
+                        <input type="email" id="quickSupplierEmail" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label for="quickSupplierAddress" class="form-label">Adresse</label>
+                        <textarea id="quickSupplierAddress" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Créer fournisseur</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmation de suppression -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirmer la suppression</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Êtes-vous sûr de vouloir supprimer cette facture ? Cette action est irréversible.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Supprimer</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/supplier_invoices.js?v={{ ASSET_VERSION() }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        initializeSupplierInvoices();
+    });
+</script>
+{% endblock %}

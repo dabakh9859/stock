@@ -1,0 +1,590 @@
+{% extends "base.html" %}
+
+{% block title %}Tableau de bord - Stock{% endblock %}
+
+{% block extra_head %}
+<link href="{{ URL_PREFIX }}/static/css/dashboard-viz.css?v={{ ASSET_VERSION() }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="viz" id="viz">
+
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+    <div>
+      <h1 class="h3 mb-1">Tableau de bord</h1>
+      <p class="text-muted mb-0" id="vizPeriodeLibelle">Chargement…</p>
+    </div>
+    <button class="btn btn-outline-secondary btn-sm" id="vizRafraichir">
+      <i class="bi bi-arrow-clockwise me-1"></i>Actualiser
+    </button>
+  </div>
+
+  <!-- Une seule rangée de filtres, au-dessus de tout ce qu'elle porte : chaque
+       encadré ci-dessous se recalcule sur la même tranche de dates. -->
+  <div class="viz-filtres">
+    <span class="text-muted small me-1">Période</span>
+    <div class="viz-filtres__presets" role="group" aria-label="Période affichée">
+      <button class="viz-preset" data-jours="7">7 jours</button>
+      <button class="viz-preset" data-jours="30" aria-pressed="true">30 jours</button>
+      <button class="viz-preset" data-jours="90">90 jours</button>
+      <button class="viz-preset" data-jours="365">12 mois</button>
+    </div>
+  </div>
+
+  <div id="vizContenu">
+
+    <!-- Un seul chiffre d'appel par vue. -->
+    <div class="viz-hero">
+      <div>
+        <div class="viz-hero__libelle">Chiffre d'affaires facturé</div>
+        <div class="viz-hero__valeur" id="vizHero">—</div>
+      </div>
+      <span class="viz-delta viz-delta--neutre" id="vizHeroDelta"></span>
+    </div>
+
+    <div class="viz-tuiles" id="vizTuiles"></div>
+
+    <div class="viz-grille viz-grille--large mb-3">
+      <section class="viz-carte">
+        <h2 class="viz-carte__titre">Facturé et encaissé, jour par jour</h2>
+        <p class="viz-carte__sous-titre">
+          L'écart entre les deux courbes est ce qui reste à recouvrer sur la période.
+        </p>
+        <div class="viz-toile viz-toile--haute"><canvas id="vizSerie"></canvas></div>
+        <details class="viz-tableau">
+          <summary>Voir les valeurs</summary>
+          <div style="max-height: 260px; overflow: auto;">
+            <table><thead><tr><th>Jour</th><th>Facturé</th><th>Encaissé</th></tr></thead>
+              <tbody id="vizSerieTable"></tbody></table>
+          </div>
+        </details>
+      </section>
+    </div>
+
+    <div class="viz-grille mb-3">
+
+      <section class="viz-carte">
+        <h2 class="viz-carte__titre">Créances par ancienneté</h2>
+        <p class="viz-carte__sous-titre">
+          Tout l'impayé en cours, quelle que soit la période affichée — une créance
+          ancienne reste due aujourd'hui.
+        </p>
+        <div class="viz-toile"><canvas id="vizCreances"></canvas></div>
+        <details class="viz-tableau">
+          <summary>Voir les valeurs</summary>
+          <table><thead><tr><th>Ancienneté</th><th>Factures</th><th>Restant dû</th></tr></thead>
+            <tbody id="vizCreancesTable"></tbody></table>
+        </details>
+      </section>
+
+      <section class="viz-carte">
+        <h2 class="viz-carte__titre">Statut d'encaissement</h2>
+        <p class="viz-carte__sous-titre">Répartition des factures émises sur la période.</p>
+        <div class="viz-barre" id="vizStatutsBarre" role="img" aria-label="Répartition des statuts"></div>
+        <div class="viz-legende" id="vizStatutsLegende"></div>
+        <details class="viz-tableau">
+          <summary>Voir les valeurs</summary>
+          <table><thead><tr><th>Statut</th><th>Factures</th><th>Montant</th></tr></thead>
+            <tbody id="vizStatutsTable"></tbody></table>
+        </details>
+      </section>
+
+      <section class="viz-carte">
+        <h2 class="viz-carte__titre">Meilleurs produits</h2>
+        <p class="viz-carte__sous-titre">Chiffre d'affaires sur la période.</p>
+        <div class="viz-toile"><canvas id="vizProduits"></canvas></div>
+        <details class="viz-tableau">
+          <summary>Voir les valeurs</summary>
+          <table><thead><tr><th>Produit</th><th>CA</th></tr></thead>
+            <tbody id="vizProduitsTable"></tbody></table>
+        </details>
+      </section>
+
+      <section class="viz-carte">
+        <h2 class="viz-carte__titre">Meilleurs clients</h2>
+        <p class="viz-carte__sous-titre">Chiffre d'affaires facturé sur la période.</p>
+        <div class="viz-toile"><canvas id="vizClients"></canvas></div>
+        <details class="viz-tableau">
+          <summary>Voir les valeurs</summary>
+          <table><thead><tr><th>Client</th><th>CA</th></tr></thead>
+            <tbody id="vizClientsTable"></tbody></table>
+        </details>
+      </section>
+
+      <section class="viz-carte">
+        <h2 class="viz-carte__titre">Ventes par catégorie</h2>
+        <p class="viz-carte__sous-titre">Part de chaque famille de produits.</p>
+        <div class="viz-toile"><canvas id="vizCategories"></canvas></div>
+        <details class="viz-tableau">
+          <summary>Voir les valeurs</summary>
+          <table><thead><tr><th>Catégorie</th><th>CA</th></tr></thead>
+            <tbody id="vizCategoriesTable"></tbody></table>
+        </details>
+      </section>
+
+      <section class="viz-carte">
+        <h2 class="viz-carte__titre">Affluence par jour et par heure</h2>
+        <p class="viz-carte__sous-titre">
+          Nombre de factures émises. Plus la case est marquée, plus l'heure est chargée.
+        </p>
+        <div class="viz-heat" id="vizHeat"></div>
+        <details class="viz-tableau">
+          <summary>Voir les valeurs</summary>
+          <div style="max-height: 220px; overflow: auto;">
+            <table><thead><tr><th>Jour</th><th>Heure</th><th>Factures</th></tr></thead>
+              <tbody id="vizHeatTable"></tbody></table>
+          </div>
+        </details>
+      </section>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const JOURS_SEMAINE = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  let periodeJours = 30;
+  let graphiques = {};
+
+  /* --- Lecture des jetons de couleur -------------------------------------
+     Les couleurs vivent dans la feuille de style, en variables CSS, pour que
+     le basculement clair/sombre se fasse à un seul endroit. Chart.js peint
+     dans un canevas : il lui faut des valeurs résolues, d'où cette lecture. */
+  function jeton(nom) {
+    return getComputedStyle(document.getElementById("viz")).getPropertyValue(nom).trim();
+  }
+
+  function palette() {
+    return {
+      s1: jeton("--viz-s1"),
+      s2: jeton("--viz-s2"),
+      ordinale: [jeton("--viz-o1"), jeton("--viz-o2"), jeton("--viz-o3"), jeton("--viz-o4")],
+      good: jeton("--viz-good"),
+      warning: jeton("--viz-warning"),
+      critical: jeton("--viz-critical"),
+      grille: jeton("--viz-grid"),
+      axe: jeton("--viz-axis"),
+      muted: jeton("--viz-muted"),
+      encre: jeton("--viz-ink"),
+      encre2: jeton("--viz-ink-2"),
+      surface: jeton("--viz-surface"),
+      tipFond: jeton("--viz-tip-bg"),
+      tipFilet: jeton("--viz-tip-border")
+    };
+  }
+
+  /* --- Formats ----------------------------------------------------------- */
+
+  const nf = new Intl.NumberFormat("fr-FR");
+
+  function montant(v) { return nf.format(Math.round(v || 0)) + " F"; }
+
+  /** Forme abrégée pour les axes et les grandes valeurs (1,2 M / 340 k). */
+  function montantCourt(v) {
+    v = v || 0;
+    if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(v >= 1e7 ? 0 : 1).replace(".", ",") + " M";
+    if (Math.abs(v) >= 1e3) return Math.round(v / 1e3) + " k";
+    return nf.format(Math.round(v));
+  }
+
+  function jourCourt(iso) {
+    const d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  }
+
+  /* --- Réglages communs aux graphiques ------------------------------------
+     Grille et axes en filet d'un seul cran par rapport à la surface, jamais en
+     pointillés ; le texte porte les jetons d'encre, jamais la couleur d'une
+     série. */
+  function axesCommuns(p) {
+    return {
+      x: {
+        grid: { display: false, color: p.grille, drawTicks: false, lineWidth: 1 },
+        border: { color: p.axe },
+        ticks: { color: p.muted, font: { size: 11 }, maxRotation: 0, autoSkipPadding: 16 }
+      },
+      y: {
+        grid: { color: p.grille, drawTicks: false, lineWidth: 1 },
+        border: { display: false },
+        ticks: { color: p.muted, font: { size: 11 }, padding: 8, callback: (v) => montantCourt(v) }
+      }
+    };
+  }
+
+  /* Infobulle : la valeur mène, le nom de la série suit — le lecteur connaît
+     déjà la série et cherche le nombre. */
+  const infobulle = (p, formateur) => ({
+    /* Surface propre à l'infobulle, distincte de celle de la carte : avec la
+       même couleur de fond et un filet discret, la bulle disparaissait — il ne
+       restait qu'un texte flottant, illisible dès qu'il croisait une courbe. */
+    backgroundColor: p.tipFond,
+    borderColor: p.tipFilet,
+    borderWidth: 1,
+    titleColor: p.encre2,
+    bodyColor: p.encre,
+    bodyFont: { size: 13, weight: "600" },   /* la valeur mène */
+    titleFont: { size: 11, weight: "400" },  /* la date suit */
+    padding: 12,
+    cornerRadius: 8,
+    displayColors: true,
+    boxWidth: 10,
+    boxHeight: 2,
+    callbacks: {
+      label: (ctx) => {
+        /* `ctx.raw` est la valeur telle qu'elle a ete fournie au jeu de donnees.
+           Passer par `ctx.parsed` est piegeux : sur une barre horizontale
+           (`indexAxis: "y"`), `parsed.y` porte l'indice de la categorie et non
+           le montant - les infobulles affichaient « 0 F », « 1 F »... */
+        const v = (typeof ctx.raw === "number")
+          ? ctx.raw
+          : (ctx.chart.options.indexAxis === "y" ? ctx.parsed.x : ctx.parsed.y);
+        return "  " + (formateur ? formateur(v) : montant(v)) + "   " + ctx.dataset.label;
+      }
+    }
+  });
+
+  /* --- Rendu des différents encadrés -------------------------------------- */
+
+  function rendreDelta(el, evolution, libellePeriode) {
+    if (evolution === null || evolution === undefined) {
+      el.className = "viz-delta viz-delta--neutre";
+      el.textContent = "période précédente sans activité";
+      return;
+    }
+    const hausse = evolution >= 0;
+    el.className = "viz-delta " + (hausse ? "viz-delta--hausse" : "viz-delta--baisse");
+    /* Flèche + signe : la couleur seule ne porte jamais le sens. */
+    el.textContent = (hausse ? "▲ +" : "▼ ") + String(evolution).replace(".", ",") + " % " + libellePeriode;
+  }
+
+  function pourcentEncaisse(i) {
+    if (!i.facture) return "aucune facture sur la période";
+    return Math.round((i.encaisse / i.facture) * 100) + " % du facturé";
+  }
+
+  function rendreTuiles(d) {
+    const i = d.indicateurs;
+    const tuiles = [
+      { libelle: "Encaissé", valeur: montant(i.encaisse), pied: pourcentEncaisse(i) },
+      { libelle: "Reste à encaisser", valeur: montant(i.restant), pied: "sur les factures de la période" },
+      { libelle: "Factures émises", valeur: nf.format(i.nb_factures), pied: "panier moyen " + montant(i.panier_moyen) },
+      { libelle: "Stock en alerte", valeur: nf.format(d.stock.faible + d.stock.rupture),
+        pied: d.stock.rupture + " en rupture, " + d.stock.faible + " au plus bas" },
+      { libelle: "Valeur du stock", valeur: montant(d.stock.valeur_vente), pied: "au prix de vente" }
+    ];
+    const hote = document.getElementById("vizTuiles");
+    hote.textContent = "";
+    tuiles.forEach((t) => {
+      const div = document.createElement("div");
+      div.className = "viz-tuile";
+      const l = document.createElement("div"); l.className = "viz-tuile__libelle"; l.textContent = t.libelle;
+      const v = document.createElement("div"); v.className = "viz-tuile__valeur"; v.textContent = t.valeur;
+      const p = document.createElement("div"); p.className = "viz-tuile__pied"; p.textContent = t.pied;
+      div.append(l, v, p);
+      hote.appendChild(div);
+    });
+  }
+
+  function rendreSerie(d, p) {
+    if (graphiques.serie) graphiques.serie.destroy();
+    graphiques.serie = new Chart(document.getElementById("vizSerie"), {
+      type: "line",
+      data: {
+        labels: d.serie.map((s) => jourCourt(s.jour)),
+        datasets: [
+          {
+            label: "Facturé", data: d.serie.map((s) => s.facture),
+            borderColor: p.s1, backgroundColor: p.s1 + "1a",   /* lavis à ~10 % */
+            borderWidth: 2, tension: 0.25, fill: true,
+            pointRadius: 0, pointHoverRadius: 5,
+            pointBackgroundColor: p.s1, pointBorderColor: p.surface, pointBorderWidth: 2
+          },
+          {
+            label: "Encaissé", data: d.serie.map((s) => s.encaisse),
+            borderColor: p.s2, backgroundColor: "transparent",
+            borderWidth: 2, tension: 0.25, fill: false,
+            pointRadius: 0, pointHoverRadius: 5,
+            pointBackgroundColor: p.s2, pointBorderColor: p.surface, pointBorderWidth: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        /* Le pointeur vise une date, jamais un trait de 2 px : l'infobulle
+           donne les deux séries pour le jour le plus proche. */
+        interaction: { mode: "index", intersect: false },
+        scales: axesCommuns(p),
+        plugins: {
+          legend: {
+            display: true, position: "top", align: "end",
+            labels: { color: p.encre2, boxWidth: 12, boxHeight: 2, font: { size: 12 } }
+          },
+          tooltip: infobulle(p)
+        }
+      }
+    });
+    remplirTable("vizSerieTable", d.serie.map((s) => [jourCourt(s.jour), montant(s.facture), montant(s.encaisse)]));
+  }
+
+  function rendreCreances(d, p) {
+    if (graphiques.creances) graphiques.creances.destroy();
+    /* Tranches ordonnées → rampe d'une seule teinte. Une couleur par tranche
+       serait un usage catégoriel injustifié. */
+    const couleurs = d.creances.map((_, idx) => p.ordinale[Math.min(idx, p.ordinale.length - 1)]);
+    graphiques.creances = new Chart(document.getElementById("vizCreances"), {
+      type: "bar",
+      data: {
+        labels: d.creances.map((c) => c.libelle),
+        datasets: [{
+          label: "Restant dû", data: d.creances.map((c) => c.montant),
+          backgroundColor: couleurs, borderRadius: 4, borderSkipped: "bottom",
+          maxBarThickness: 24
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: axesCommuns(p),
+        plugins: {
+          legend: { display: false },   /* une seule série : le titre suffit */
+          tooltip: infobulle(p)
+        }
+      }
+    });
+    remplirTable("vizCreancesTable", d.creances.map((c) => [c.libelle, nf.format(c.nb), montant(c.montant)]));
+  }
+
+  function rendreStatuts(d, p) {
+    const total = d.statuts.reduce((s, x) => s + x.montant, 0);
+    const barre = document.getElementById("vizStatutsBarre");
+    const legende = document.getElementById("vizStatutsLegende");
+    barre.textContent = ""; legende.textContent = "";
+
+    const icones = { payee: "✓", partielle: "◐", attente: "○", autre: "·" };
+    const couleurStatut = (cle) => cle === "payee" ? p.good : cle === "partielle" ? p.warning
+      : cle === "attente" ? p.critical : p.muted;
+
+    d.statuts.forEach((s) => {
+      if (total > 0 && s.montant > 0) {
+        const part = document.createElement("div");
+        part.className = "viz-barre__part viz-barre__part--" + s.cle;
+        part.style.flex = String(s.montant);
+        part.title = s.libelle + " — " + montant(s.montant);
+        barre.appendChild(part);
+      }
+      const item = document.createElement("div");
+      item.className = "viz-legende__item";
+      const cle = document.createElement("span");
+      cle.className = "viz-legende__cle";
+      cle.style.background = couleurStatut(s.cle);
+      const txt = document.createElement("span");
+      /* Icône + libellé : un état ne se lit jamais à la couleur seule. */
+      txt.textContent = (icones[s.cle] || "·") + " " + s.libelle + " (" + s.nb + ")";
+      const val = document.createElement("span");
+      val.className = "viz-legende__valeur";
+      val.textContent = montant(s.montant);
+      item.append(cle, txt, val);
+      legende.appendChild(item);
+    });
+    remplirTable("vizStatutsTable", d.statuts.map((s) => [s.libelle, nf.format(s.nb), montant(s.montant)]));
+  }
+
+  /* Catégories nominales — produits, clients, familles : une seule couleur pour
+     toutes les barres. Les teinter selon leur valeur rejouerait en couleur ce
+     que la longueur dit déjà. */
+  function rendreBarresHorizontales(idCanvas, idTable, lignes, p, lienVers) {
+    if (graphiques[idCanvas]) graphiques[idCanvas].destroy();
+    const toile = document.getElementById(idCanvas);
+    graphiques[idCanvas] = new Chart(toile, {
+      type: "bar",
+      data: {
+        labels: lignes.map((l) => l.libelle),
+        datasets: [{
+          label: "Chiffre d'affaires", data: lignes.map((l) => l.montant),
+          backgroundColor: p.s1, borderRadius: 4, borderSkipped: "start",
+          maxBarThickness: 18
+        }]
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: {
+            grid: { color: p.grille, drawTicks: false, lineWidth: 1 },
+            border: { display: false },
+            ticks: { color: p.muted, font: { size: 11 }, callback: (v) => montantCourt(v) }
+          },
+          y: {
+            grid: { display: false },
+            border: { color: p.axe },
+            ticks: {
+              color: p.encre2, font: { size: 11 },
+              /* Un nom trop long est abrégé ici plutôt que de rogner le tracé ;
+                 la valeur complète reste dans l'infobulle et dans le tableau. */
+              callback: function (v) {
+                const t = this.getLabelForValue(v);
+                return t.length > 22 ? t.slice(0, 21) + "…" : t;
+              }
+            }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: infobulle(p, montant)
+        },
+        /* Une barre qui mène quelque part doit le montrer : curseur main au
+           survol, et le clic ouvre la fiche correspondante. */
+        onHover: lienVers
+          ? (evt, elements) => {
+              const cible = elements.length ? lienVers(lignes[elements[0].index]) : null;
+              evt.native.target.style.cursor = cible ? "pointer" : "default";
+            }
+          : undefined,
+        onClick: lienVers
+          ? (evt, elements) => {
+              if (!elements.length) return;
+              const url = lienVers(lignes[elements[0].index]);
+              if (url) window.location.href = url;
+            }
+          : undefined
+      }
+    });
+    remplirTable(idTable, lignes.map((l) => [l.libelle, montant(l.montant)]), lienVers ? lignes.map(lienVers) : null);
+  }
+
+  function rendreHeat(d, p) {
+    const hote = document.getElementById("vizHeat");
+    hote.textContent = "";
+    const heures = d.activite.heures;
+    hote.style.setProperty("--viz-heat-cols", heures.length);
+
+    hote.appendChild(document.createElement("span"));   /* case d'angle */
+    heures.forEach((h) => {
+      const e = document.createElement("span");
+      e.className = "viz-heat__heure";
+      e.textContent = (h % 3 === 0) ? h + "h" : "";
+      hote.appendChild(e);
+    });
+
+    const max = d.activite.max || 1;
+    const parCle = {};
+    d.activite.cellules.forEach((c) => { parCle[c.jour + ":" + c.heure] = c.nb; });
+
+    for (let j = 1; j <= 7; j++) {
+      const lib = document.createElement("span");
+      lib.className = "viz-heat__jour";
+      lib.textContent = JOURS_SEMAINE[j - 1];
+      hote.appendChild(lib);
+
+      heures.forEach((h) => {
+        const nb = parCle[j + ":" + h] || 0;
+        const cel = document.createElement("div");
+        cel.className = "viz-heat__cell";
+        /* Rampe séquentielle d'une seule teinte : l'opacité porte la magnitude,
+           la case vide reste la surface. */
+        const alpha = nb ? Math.round(26 + (nb / max) * 229).toString(16).padStart(2, "0") : null;
+        cel.style.setProperty("--viz-cell", alpha ? p.s1 + alpha : "transparent");
+        cel.tabIndex = 0;
+        const libelle = JOURS_SEMAINE[j - 1] + " " + h + "h — " + nb + (nb > 1 ? " factures" : " facture");
+        cel.title = libelle;
+        cel.setAttribute("aria-label", libelle);
+        hote.appendChild(cel);
+      });
+    }
+
+    remplirTable("vizHeatTable", d.activite.cellules.filter((c) => c.nb > 0)
+      .sort((a, b) => b.nb - a.nb)
+      .map((c) => [JOURS_SEMAINE[c.jour - 1], c.heure + "h", nf.format(c.nb)]));
+  }
+
+  /** Les libellés viennent de la base : insertion par texte, jamais par HTML. */
+  function remplirTable(id, lignes, liens) {
+    const tbody = document.getElementById(id);
+    if (!tbody) return;
+    tbody.textContent = "";
+    lignes.forEach((cells, i) => {
+      const tr = document.createElement("tr");
+      cells.forEach((c, j) => {
+        const td = document.createElement("td");
+        // La première colonne devient un lien quand il y en a un : le tableau
+        // reste ainsi un chemin d'accès complet, sans dépendre d'un clic
+        // précis sur une barre du graphique.
+        const url = (j === 0 && liens && liens[i]) ? liens[i] : null;
+        if (url) {
+          const a = document.createElement("a");
+          a.href = url;
+          a.className = "text-reset";
+          a.textContent = c;
+          td.appendChild(a);
+        } else {
+          td.textContent = c;
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  /* --- Chargement --------------------------------------------------------- */
+
+  const LIBELLES = { 7: "vs 7 jours précédents", 30: "vs 30 jours précédents",
+                     90: "vs 90 jours précédents", 365: "vs 12 mois précédents" };
+
+  async function charger() {
+    const contenu = document.getElementById("vizContenu");
+    contenu.classList.add("viz-charge");   /* la vue précédente reste affichée */
+    try {
+      const reponse = await axios.get("/api/dashboard/overview", { params: { days: periodeJours } });
+      const d = reponse.data;
+      const p = palette();
+
+      document.getElementById("vizHero").textContent = montant(d.indicateurs.facture);
+      rendreDelta(document.getElementById("vizHeroDelta"),
+        d.indicateurs.evolution.facture, LIBELLES[periodeJours] || "");
+      document.getElementById("vizPeriodeLibelle").textContent =
+        "Du " + jourCourt(d.periode.debut) + " au " + jourCourt(d.periode.fin)
+        + " · " + d.indicateurs.nb_factures + " factures";
+
+      rendreTuiles(d);
+      rendreSerie(d, p);
+      rendreCreances(d, p);
+      rendreStatuts(d, p);
+      rendreBarresHorizontales("vizProduits", "vizProduitsTable", d.top_produits, p);
+      rendreBarresHorizontales("vizClients", "vizClientsTable", d.top_clients, p,
+        (ligne) => ligne.id ? appPath("/clients/detail?id=" + ligne.id) : null);
+      rendreBarresHorizontales("vizCategories", "vizCategoriesTable", d.categories, p);
+      rendreHeat(d, p);
+    } catch (e) {
+      console.error("Tableau de bord :", e);
+      if (window.showAlert) showAlert("Impossible de charger le tableau de bord", "danger");
+    } finally {
+      contenu.classList.remove("viz-charge");
+    }
+  }
+
+  document.querySelectorAll(".viz-preset").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".viz-preset").forEach((b) => b.removeAttribute("aria-pressed"));
+      btn.setAttribute("aria-pressed", "true");
+      periodeJours = Number(btn.dataset.jours);
+      charger();
+    });
+  });
+
+  document.getElementById("vizRafraichir").addEventListener("click", charger);
+
+  /* Le basculement clair/sombre change les jetons : on repeint les canevas,
+     qui ne suivent pas les variables CSS d'eux-mêmes. */
+  new MutationObserver(() => charger()).observe(document.documentElement, {
+    attributes: true, attributeFilter: ["data-theme"]
+  });
+
+  charger();
+})();
+</script>
+{% endblock %}

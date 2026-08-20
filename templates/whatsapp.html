@@ -1,0 +1,560 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion WhatsApp - Stock{% endblock %}
+
+{% block extra_head %}
+{# Bootstrap et ses icônes sont déjà chargés par base.html. Les recharger ici les
+   plaçait *après* la feuille du thème et rendait à cette page seule l'apparence
+   d'origine (boutons bleus, en-têtes de carte gris). #}
+<style>
+    .qr-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 300px;
+    }
+    .qr-code {
+        width: 256px;
+        height: 256px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        background: white;
+    }
+    .status-connected {
+        color: hsl(var(--success));
+    }
+    .status-disconnected {
+        color: hsl(var(--danger));
+    }
+    .status-pending {
+        color: hsl(var(--warning));
+    }
+    .message-form {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    .client-info {
+        background: hsl(var(--muted));
+        border-radius: 8px;
+        padding: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">WhatsApp</h1>
+                <p class="page-subtitle">Connexion du compte et envoi de messages aux clients</p>
+            </div>
+        </div>
+
+        <!-- Status Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">État de la connexion</h6>
+                        <button id="refreshBtn" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-arrow-clockwise"></i> Actualiser
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="statusContent">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                                <p class="mt-2">Chargement de l'état...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code Section -->
+        <div class="row mb-4" id="qrSection" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Code QR de connexion</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="qr-container">
+                            <div id="qrCodeDisplay">
+                                <div class="text-center">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Génération du QR...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <p class="text-muted">
+                                <small>Scannez ce code QR avec votre application WhatsApp pour connecter le service.</small>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Client Info Section -->
+        <div class="row mb-4" id="clientInfoSection" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Informations du compte</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="clientInfoContent" class="client-info">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Send Message Section -->
+        <div class="row mb-4" id="messageSection" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Envoyer un message</h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="messageForm" class="message-form">
+                            <div class="mb-3">
+                                <label for="phoneNumber" class="form-label">Numéro de téléphone</label>
+                                <input type="text" class="form-control" id="phoneNumber" 
+                                       placeholder="Ex: +221771234567" required>
+                                <div class="form-text">Format international avec le code pays (ex: +221 pour le Sénégal)</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="messageText" class="form-label">Message</label>
+                                <textarea class="form-control" id="messageText" rows="4" 
+                                          placeholder="Votre message..." required></textarea>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-send"></i> Envoyer
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" id="clearBtn">
+                                    <i class="bi bi-x-circle"></i> Effacer
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Send File Section -->
+        <div class="row mb-4" id="fileSection" style="display: none;">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Envoyer un fichier</h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="fileForm" class="message-form">
+                            <div class="mb-3">
+                                <label for="filePhoneNumber" class="form-label">Numéro de téléphone</label>
+                                <input type="text" class="form-control" id="filePhoneNumber" 
+                                       placeholder="Ex: +221771234567" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="fileUrl" class="form-label">URL du fichier</label>
+                                <input type="url" class="form-control" id="fileUrl" 
+                                       placeholder="https://exemple.com/document.pdf" required>
+                                <div class="form-text">URL publique du fichier à envoyer (PDF, image, etc.)</div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="fileName" class="form-label">Nom du fichier (optionnel)</label>
+                                <input type="text" class="form-control" id="fileName" 
+                                       placeholder="document.pdf">
+                            </div>
+                            <div class="mb-3">
+                                <label for="fileCaption" class="form-label">Légende (optionnel)</label>
+                                <input type="text" class="form-control" id="fileCaption" 
+                                       placeholder="Voici votre document">
+                            </div>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-file-earmark-arrow-up"></i> Envoyer le fichier
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Actions</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex gap-2">
+                            <button id="logoutBtn" class="btn btn-danger" style="display: none;">
+                                <i class="bi bi-box-arrow-right"></i> Déconnecter
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div id="toast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto" id="toastTitle">Notification</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toastBody"></div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/qrcode.min.js"></script>
+<script>
+        // API base URL
+        const API_BASE = '/api/whatsapp';
+        
+        // Polling interval
+        const POLL_INTERVAL = 2500;
+        
+        // State
+        let pollIntervalId = null;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            startPolling();
+            setupEventListeners();
+        });
+        
+        // Start polling
+        function startPolling() {
+            if (pollIntervalId) {
+                clearInterval(pollIntervalId);
+            }
+            pollIntervalId = setInterval(checkStatus, POLL_INTERVAL);
+        }
+        
+        // Stop polling
+        function stopPolling() {
+            if (pollIntervalId) {
+                clearInterval(pollIntervalId);
+                pollIntervalId = null;
+            }
+        }
+        
+        // Check status
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                const data = await response.json();
+                
+                updateStatusDisplay(data);
+                
+                if (data.connected && data.ready) {
+                    showClientInfo();
+                    hideQRCode();
+                } else if (data.hasQr) {
+                    showQRCode();
+                }
+                
+                // Show/hide sections based on status
+                const messageSection = document.getElementById('messageSection');
+                const fileSection = document.getElementById('fileSection');
+                const logoutBtn = document.getElementById('logoutBtn');
+                
+                if (data.connected && data.ready) {
+                    messageSection.style.display = 'block';
+                    fileSection.style.display = 'block';
+                    logoutBtn.style.display = 'inline-block';
+                } else {
+                    messageSection.style.display = 'none';
+                    fileSection.style.display = 'none';
+                    logoutBtn.style.display = 'none';
+                }
+                
+            } catch (error) {
+                console.error('Error checking status:', error);
+                updateStatusDisplay({ connected: false, ready: false, error: error.message });
+            }
+        }
+        
+        // Update status display
+        function updateStatusDisplay(data) {
+            const statusContent = document.getElementById('statusContent');
+            
+            let statusClass = 'status-disconnected';
+            let statusIcon = 'bi-x-circle';
+            let statusText = 'Déconnecté';
+            
+            if (data.connected && data.ready) {
+                statusClass = 'status-connected';
+                statusIcon = 'bi-check-circle';
+                statusText = 'Connecté et prêt';
+            } else if (data.hasQr) {
+                statusClass = 'status-pending';
+                statusIcon = 'bi-qr-code';
+                statusText = 'En attente de scan QR';
+            }
+            
+            statusContent.innerHTML = `
+                <div class="d-flex align-items-center justify-content-center ${statusClass}">
+                    <i class="bi ${statusIcon} fs-1 me-3"></i>
+                    <div>
+                        <h4 class="mb-0">${statusText}</h4>
+                        ${data.error ? `<p class="mb-0 text-muted small">Erreur: ${data.error}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Show QR code
+        async function showQRCode() {
+            const qrSection = document.getElementById('qrSection');
+            const qrCodeDisplay = document.getElementById('qrCodeDisplay');
+
+            qrSection.style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_BASE}/qr`);
+                const data = await response.json();
+
+                if (data.qr) {
+                    // Try client-side QR rendering first
+                    if (typeof QRCode !== 'undefined') {
+                        qrCodeDisplay.innerHTML = '';
+                        const canvas = document.createElement('canvas');
+                        canvas.className = 'qr-code';
+                        qrCodeDisplay.appendChild(canvas);
+                        QRCode.toCanvas(canvas, data.qr, {
+                            width: 256, margin: 2,
+                            color: { dark: '#000000', light: '#ffffff' }
+                        }, function(error) {
+                            if (error && data.qrBase64) {
+                                qrCodeDisplay.innerHTML = `<img src="${data.qrBase64}" alt="QR Code" class="qr-code">`;
+                            } else if (error) {
+                                showFallbackQR(data.qr);
+                            }
+                        });
+                    } else if (data.qrBase64) {
+                        qrCodeDisplay.innerHTML = `<img src="${data.qrBase64}" alt="QR Code" class="qr-code">`;
+                    } else {
+                        showFallbackQR(data.qr);
+                    }
+                } else if (data.qrBase64) {
+                    // Evolution API returned only base64 image (no raw code)
+                    qrCodeDisplay.innerHTML = `<img src="${data.qrBase64}" alt="QR Code" class="qr-code">`;
+                } else if (data.connected) {
+                    hideQRCode();
+                }
+            } catch (error) {
+                console.error('Error fetching QR:', error);
+            }
+        }
+        
+        // Show fallback QR (external API)
+        function showFallbackQR(qrData) {
+            const qrCodeDisplay = document.getElementById('qrCodeDisplay');
+            qrCodeDisplay.innerHTML = `
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}" 
+                     alt="QR Code" class="qr-code" onerror="this.style.display='none'">
+            `;
+        }
+        
+        // Hide QR code
+        function hideQRCode() {
+            const qrSection = document.getElementById('qrSection');
+            qrSection.style.display = 'none';
+        }
+        
+        // Show client info
+        async function showClientInfo() {
+            const clientInfoSection = document.getElementById('clientInfoSection');
+            const clientInfoContent = document.getElementById('clientInfoContent');
+            
+            clientInfoSection.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_BASE}/client-info`);
+                const data = await response.json();
+                
+                if (data.pushName) {
+                    clientInfoContent.innerHTML = `
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Nom:</strong> ${data.pushName}</p>
+                                <p><strong>Numéro:</strong> ${data.wid}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Plateforme:</strong> ${data.platform || 'N/A'}</p>
+                                <p><strong>Statut:</strong> <span class="badge bg-success">Connecté</span></p>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error fetching client info:', error);
+            }
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            // Refresh button
+            document.getElementById('refreshBtn').addEventListener('click', () => {
+                checkStatus();
+            });
+            
+            // Message form
+            document.getElementById('messageForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const phoneNumber = document.getElementById('phoneNumber').value.trim();
+                const messageText = document.getElementById('messageText').value.trim();
+                
+                if (!phoneNumber || !messageText) {
+                    showToast('Erreur', 'Veuillez remplir tous les champs', 'danger');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${API_BASE}/send-text`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            number: phoneNumber,
+                            message: messageText
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('Succès', 'Message envoyé avec succès', 'success');
+                        document.getElementById('messageText').value = '';
+                    } else {
+                        showToast('Erreur', data.error || 'Erreur lors de l\'envoi', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error sending message:', error);
+                    showToast('Erreur', 'Erreur lors de l\'envoi du message', 'danger');
+                }
+            });
+            
+            // Clear button
+            document.getElementById('clearBtn').addEventListener('click', () => {
+                document.getElementById('phoneNumber').value = '';
+                document.getElementById('messageText').value = '';
+            });
+            
+            // File form
+            document.getElementById('fileForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const phoneNumber = document.getElementById('filePhoneNumber').value.trim();
+                const fileUrl = document.getElementById('fileUrl').value.trim();
+                const fileName = document.getElementById('fileName').value.trim();
+                const fileCaption = document.getElementById('fileCaption').value.trim();
+                
+                if (!phoneNumber || !fileUrl) {
+                    showToast('Erreur', 'Veuillez remplir le numéro et l\'URL du fichier', 'danger');
+                    return;
+                }
+                
+                try {
+                    showToast('Info', 'Envoi du fichier en cours...', 'info');
+                    
+                    const response = await fetch(`${API_BASE}/send-file`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            number: phoneNumber,
+                            url: fileUrl,
+                            filename: fileName || undefined,
+                            caption: fileCaption || undefined
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('Succès', 'Fichier envoyé avec succès', 'success');
+                        document.getElementById('fileUrl').value = '';
+                        document.getElementById('fileName').value = '';
+                        document.getElementById('fileCaption').value = '';
+                    } else {
+                        showToast('Erreur', data.error || 'Erreur lors de l\'envoi', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error sending file:', error);
+                    showToast('Erreur', 'Erreur lors de l\'envoi du fichier', 'danger');
+                }
+            });
+            
+            // Logout button
+            document.getElementById('logoutBtn').addEventListener('click', async () => {
+                if (!confirm('Êtes-vous sûr de vouloir déconnecter WhatsApp ?')) {
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${API_BASE}/logout`, {
+                        method: 'POST'
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showToast('Succès', 'WhatsApp déconnecté', 'success');
+                        checkStatus();
+                    } else {
+                        showToast('Erreur', data.error || 'Erreur lors de la déconnexion', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error logging out:', error);
+                    showToast('Erreur', 'Erreur lors de la déconnexion', 'danger');
+                }
+            });
+        }
+        
+        // Show toast notification
+        function showToast(title, message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastBody = document.getElementById('toastBody');
+            
+            toastTitle.textContent = title;
+            toastBody.textContent = message;
+            
+            toast.className = `toast bg-${type} text-white`;
+            
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            stopPolling();
+        });
+</script>
+{% endblock %}

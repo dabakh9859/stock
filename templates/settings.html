@@ -1,0 +1,928 @@
+{% extends "base.html" %}
+
+{% block title %}Paramètres - Stock{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Paramètres</h1>
+        <p class="page-subtitle">Entreprise, facturation, utilisateurs et intégrations</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Navigation des paramètres -->
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="m-0">
+                    <i class="bi bi-list me-2"></i>Catégories
+                </h6>
+            </div>
+
+            
+            <div class="list-group list-group-flush">
+                <a href="#general" class="list-group-item list-group-item-action active" data-bs-toggle="pill">
+                    <i class="bi bi-gear me-2"></i>Général
+                </a>
+                <a href="#company" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="bi bi-building me-2"></i>Entreprise
+                </a>
+                <a href="#invoice" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="bi bi-receipt me-2"></i>Facturation
+                </a>
+                <a href="#stock" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="bi bi-box me-2"></i>Stock
+                </a>
+                <a href="#product-conditions" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="bi bi-sliders me-2"></i>États produits
+                </a>
+                <a href="#imageSearch" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="bi bi-search me-2"></i>Recherche d'images
+                </a>
+                <a href="#users" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="bi bi-people me-2"></i>Utilisateurs
+                </a>
+                <a href="#metier" class="list-group-item list-group-item-action admin-only"
+                    data-bs-toggle="pill">
+                    <i class="bi bi-shop me-2"></i>Métier de la boutique
+                </a>
+                <a href="#email" class="list-group-item list-group-item-action admin-only"
+                    data-bs-toggle="pill">
+                    <i class="bi bi-envelope me-2"></i>E-mail
+                </a>
+                <a href="#assistant" class="list-group-item list-group-item-action admin-only"
+                    data-bs-toggle="pill">
+                    <i class="bi bi-robot me-2"></i>Assistant IA
+                </a>
+                <a href="#categories" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="bi bi-tags me-2"></i>Catégories
+                </a>
+                <a href="#backup" class="list-group-item list-group-item-action" data-bs-toggle="pill">
+                    <i class="bi bi-cloud-download me-2"></i>Sauvegarde
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenu des paramètres -->
+    <div class="col-md-9">
+        <div class="tab-content">
+            <!-- Paramètres Généraux -->
+            <div class="tab-pane fade show active" id="general">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0">
+                            <i class="bi bi-gear me-2"></i>Paramètres Généraux
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="generalSettingsForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="appName" class="form-label">Nom de l'application</label>
+                                        <input type="text" class="form-control" id="appName" value="Stock">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="appVersion" class="form-label">Version</label>
+                                        <input type="text" class="form-control" id="appVersion" value="1.0.0" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="defaultCurrency" class="form-label">Devise par défaut</label>
+                                        <select class="form-select" id="defaultCurrency">
+                                            <option value="XOF" selected>Franc CFA (XOF)</option>
+                                            <option value="EUR">Euro (EUR)</option>
+                                            <option value="USD">Dollar US (USD)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="defaultLanguage" class="form-label">Langue par défaut</label>
+                                        <select class="form-select" id="defaultLanguage">
+                                            <option value="fr" selected>Français</option>
+                                            <option value="en">English</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="timezone" class="form-label">Fuseau horaire</label>
+                                        <select class="form-select" id="timezone">
+                                            <option value="Africa/Dakar" selected>Afrique/Dakar (GMT+0)</option>
+                                            <option value="Europe/Paris">Europe/Paris (GMT+1)</option>
+                                            <option value="America/New_York">Amérique/New York (GMT-5)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="dateFormat" class="form-label">Format de date</label>
+                                        <select class="form-select" id="dateFormat">
+                                            <option value="DD/MM/YYYY" selected>DD/MM/YYYY</option>
+                                            <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                            <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <hr class="my-4">
+                            <h6 class="mb-3"><i class="bi bi-image me-2"></i>Favicon de l'onglet</h6>
+                            <div class="row g-3 align-items-center">
+                              <div class="col-md-6">
+                                <label class="form-label" for="faviconFile">Fichier image (ICO, PNG, SVG)</label>
+                                <input type="file" class="form-control" id="faviconFile" accept="image/x-icon,image/png,image/svg+xml">
+                                <div class="form-text">Taille recommandée: 32x32 ou 64x64 pixels</div>
+                              </div>
+                              <div class="col-md-6">
+                                <div class="card" style="max-width: 420px;">
+                                  <div class="card-body">
+                                    <div class="mb-2 small text-muted">Aperçu</div>
+                                    <div class="d-flex align-items-center gap-3 mb-2">
+                                      <img id="faviconPreview" alt="Aperçu favicon" style="width:32px; height:32px; display:none; border: 1px solid #ddd; border-radius: 4px;" />
+                                      <input id="faviconUrl" type="text" class="form-control form-control-sm" placeholder="URL actuelle" readonly>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="mt-3 d-flex gap-2">
+                              <button type="button" class="btn btn-outline-primary" onclick="uploadFavicon()">
+                                <i class="bi bi-cloud-upload me-2"></i>Uploader
+                              </button>
+                              <button type="button" class="btn btn-outline-secondary" onclick="resetFavicon()">
+                                <i class="bi bi-arrow-counterclockwise me-2"></i>Réinitialiser
+                              </button>
+                            </div>
+
+                            <button type="button" class="btn btn-primary mt-4" onclick="saveGeneralSettings()">
+                                <i class="bi bi-check-circle me-2"></i>Enregistrer
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- États des produits -->
+            <div class="tab-pane fade" id="imageSearch">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="m-0">
+                            <i class="bi bi-search me-2"></i>Recherche d'images en ligne
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">
+                            Permet de chercher des visuels depuis le formulaire produit et de les importer
+                            en un clic. Nécessite un compte <a href="https://serpapi.com" target="_blank"
+                            rel="noopener">SerpAPI</a> (100 recherches par mois en offre gratuite).
+                        </p>
+                        <form id="imageSearchSettingsForm">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label">Clé API SerpAPI</label>
+                                    <input type="password" class="form-control" id="serpapiKey"
+                                        placeholder="Collez votre clé ici" autocomplete="off">
+                                    <div class="form-text" id="serpapiStatus">Chargement…</div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Pays</label>
+                                    <select class="form-select" id="serpapiCountry">
+                                        <option value="sn">Sénégal</option>
+                                        <option value="fr">France</option>
+                                        <option value="us">États-Unis</option>
+                                        <option value="ma">Maroc</option>
+                                        <option value="ci">Côte d'Ivoire</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">Langue</label>
+                                    <select class="form-select" id="serpapiLanguage">
+                                        <option value="fr">Français</option>
+                                        <option value="en">Anglais</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary mt-3">
+                                <i class="bi bi-check2 me-1"></i>Enregistrer
+                            </button>
+                            <span id="imageSearchSaveStatus" class="ms-2 small"></span>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="product-conditions">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="m-0">
+                            <i class="bi bi-sliders me-2"></i>États configurables des produits
+                        </h6>
+                        <span class="text-muted small">Utilisé dans les formulaires Produits et Variantes</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Définissez la liste des états autorisés (ex: "neuf", "occasion", "venant") et l'état par défaut pour les nouveaux produits.
+                        </div>
+                        <form id="productConditionsForm">
+                            <div class="mb-3">
+                                <label class="form-label" for="productConditionsOptions">États autorisés</label>
+                                <textarea id="productConditionsOptions" class="form-control" rows="3" placeholder="Une valeur par ligne (ex: neuf\noccasion\nvenant)"></textarea>
+                                <div class="form-text">Chaque ligne représente un état autorisé. Pas de doublons.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label" for="productConditionsDefault">État par défaut</label>
+                                <select id="productConditionsDefault" class="form-select">
+                                    <option value="">Sélectionner...</option>
+                                </select>
+                            </div>
+                            <div class="text-end">
+                                <button type="button" class="btn btn-primary" onclick="saveProductConditions()">
+                                    <i class="bi bi-check-circle me-2"></i>Enregistrer
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paramètres Entreprise -->
+            <div class="tab-pane fade" id="company">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0">
+                            <i class="bi bi-building me-2"></i>Informations de l'Entreprise
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="companySettingsForm">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="companyName" class="form-label">Nom de l'entreprise *</label>
+                                        <input type="text" class="form-control" id="companyName" value="Stock" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="companyPhone" class="form-label">Téléphone</label>
+                                        <input type="tel" class="form-control" id="companyPhone" value="+221 33 XXX XX XX">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="companyAddress" class="form-label">Adresse</label>
+                                <textarea class="form-control" id="companyAddress" rows="2">Dakar, Sénégal</textarea>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="companyEmail" class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="companyEmail" value="contact@techzone.com">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="companyWebsite" class="form-label">Site web</label>
+                                        <input type="url" class="form-control" id="companyWebsite" value="https://techzone.com">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="companyTaxNumber" class="form-label">Numéro fiscal</label>
+                                        <input type="text" class="form-control" id="companyTaxNumber">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="companyRegistration" class="form-label">Numéro d'enregistrement</label>
+                                        <input type="text" class="form-control" id="companyRegistration">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="companyLogo" class="form-label">Logo de l'entreprise</label>
+                                <input type="file" class="form-control" id="companyLogo" accept="image/*">
+                                <div class="form-text">Formats acceptés: JPG, PNG, SVG (max 2MB)</div>
+                            </div>
+
+                            <button type="button" class="btn btn-primary" onclick="saveCompanySettings()">
+                                <i class="bi bi-check-circle me-2"></i>Enregistrer
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paramètres Facturation -->
+            <div class="tab-pane fade" id="invoice">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0">
+                            <i class="bi bi-receipt me-2"></i>Paramètres de Facturation
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="invoiceSettingsForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="invoicePrefix" class="form-label">Préfixe des factures</label>
+                                        <input type="text" class="form-control" id="invoicePrefix" value="FAC-">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="quotationPrefix" class="form-label">Préfixe des devis</label>
+                                        <input type="text" class="form-control" id="quotationPrefix" value="DEV-">
+                                    </div>
+                                </div>
+                            </div>
+
+                             <div class="mb-3">
+                                 <label for="invoicePaymentMethods" class="form-label">Méthodes de paiement utilisées</label>
+                                 <textarea class="form-control" id="invoicePaymentMethods" rows="4" placeholder="Une méthode par ligne (ex: Espèces, Orange Money, Wave, Chèque, Virement bancaire)"></textarea>
+                                 <div class="form-text">Ces méthodes alimentent les listes de choix lors de la création d'une facture et l'enregistrement des paiements.</div>
+                             </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="paymentTerms" class="form-label">Conditions de paiement (jours)</label>
+                                        <input type="number" class="form-control" id="paymentTerms" value="30" min="0">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="invoiceFooter" class="form-label">Pied de page des factures</label>
+                                <textarea class="form-control" id="invoiceFooter" rows="3">Merci de votre confiance. Paiement à réception de facture.</textarea>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="autoInvoiceNumber" checked>
+                                <label class="form-check-label" for="autoInvoiceNumber">
+                                    Numérotation automatique des factures
+                                </label>
+                            </div>
+
+                            <hr class="my-4">
+
+                            <h6 class="mb-3"><i class="bi bi-shield-check me-2"></i>Garanties par catégorie</h6>
+                            <p class="text-muted small">Définissez les textes de garantie pour chaque catégorie de produit. Ces garanties seront affichées automatiquement dans les factures selon les produits vendus.</p>
+                            
+                            <div id="warrantyList">
+                                <!-- Les garanties seront chargées ici -->
+                            </div>
+                            
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addWarrantyCategory()">
+                                <i class="bi bi-plus-circle me-1"></i>Ajouter une garantie
+                            </button>
+
+                            <button type="button" class="btn btn-primary mt-4" onclick="saveInvoiceSettings()">
+                                <i class="bi bi-check-circle me-2"></i>Enregistrer
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Paramètres Stock -->
+            <div class="tab-pane fade" id="stock">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0">
+                            <i class="bi bi-box me-2"></i>Paramètres de Stock
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <form id="stockSettingsForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="lowStockThreshold" class="form-label">Seuil de stock faible</label>
+                                        <input type="number" class="form-control" id="lowStockThreshold" value="10" min="0">
+                                        <div class="form-text">Alerte quand le stock est inférieur à cette valeur</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="stockMethod" class="form-label">Méthode de valorisation</label>
+                                        <select class="form-select" id="stockMethod">
+                                            <option value="FIFO" selected>FIFO (Premier entré, premier sorti)</option>
+                                            <option value="LIFO">LIFO (Dernier entré, premier sorti)</option>
+                                            <option value="AVERAGE">Prix moyen pondéré</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="trackSerialNumbers" checked>
+                                <label class="form-check-label" for="trackSerialNumbers">
+                                    Suivre les {{ mot('identifiant') | lower }}
+                                </label>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="autoStockMovements" checked>
+                                <label class="form-check-label" for="autoStockMovements">
+                                    Mouvements de stock automatiques lors des ventes
+                                </label>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="stockAlerts" checked>
+                                <label class="form-check-label" for="stockAlerts">
+                                    Alertes de stock faible
+                                </label>
+                            </div>
+
+                            <button type="button" class="btn btn-primary" onclick="saveStockSettings()">
+                                <i class="bi bi-check-circle me-2"></i>Enregistrer
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gestion Utilisateurs -->
+            <div class="tab-pane fade" id="users">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0">
+                            <i class="bi bi-people me-2"></i>Gestion des Utilisateurs
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6>Utilisateurs du système</h6>
+                            <button class="btn btn-primary btn-sm" onclick="openUserModal()">
+                                <i class="bi bi-person-plus me-2"></i>Nouvel utilisateur
+                            </button>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Utilisateur</th>
+                                        <th>Email</th>
+                                        <th>Rôle</th>
+                                        <th>Statut</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <tr>
+                                        <td colspan="5" class="text-center">
+                                            <div class="spinner-border" role="status">
+                                                <span class="visually-hidden">Chargement...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Catégories -->
+            <div class="tab-pane fade" id="categories">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0">
+                            <i class="bi bi-tags me-2"></i>Gestion des Catégories de Produits
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <form id="categoryForm" class="row g-2 align-items-center">
+                                    <input type="hidden" id="categoryId">
+                                    <div class="col-md-6">
+                                        <input type="text" class="form-control" id="categoryName" placeholder="Nom de la catégorie" required>
+                                    </div>
+                                    <div class="col-md-4 form-check">
+                                        <input class="form-check-input" type="checkbox" id="categoryRequiresVariants">
+                                        <label class="form-check-label" for="categoryRequiresVariants">
+                                            Variantes requises
+                                        </label>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary w-100" id="saveCategoryBtn" onclick="saveCategory()">
+                                            <i class="bi bi-plus-circle me-2"></i>Ajouter
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Nombre de produits</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="categoriesTableBody">
+                                    <tr>
+                                        <td colspan="3" class="text-center">
+                                            <div class="spinner-border" role="status">
+                                                <span class="visually-hidden">Chargement...</span>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Gestion des Attributs de Catégorie -->
+                        <div class="card mt-4" id="categoryAttributesCard">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="m-0">
+                                    <i class="bi bi-sliders me-2"></i>Attributs de la Catégorie
+                                </h6>
+                                <div class="text-muted small" id="selectedCategoryLabel">Aucune catégorie sélectionnée</div>
+                            </div>
+                            <div class="card-body">
+                                <form id="attributeForm" class="row g-2 align-items-end">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Nom de l'attribut</label>
+                                        <input type="text" class="form-control" id="attrName" placeholder="ex: Stockage">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Type</label>
+                                        <select class="form-select" id="attrType">
+                                            <option value="select" selected>Liste (sélection)</option>
+                                            <option value="multiselect">Liste (multi-sélection)</option>
+                                            <option value="text">Texte</option>
+                                            <option value="number">Nombre</option>
+                                            <option value="boolean">Oui/Non</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="attrRequired">
+                                        <label class="form-check-label" for="attrRequired">Obligatoire</label>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Valeurs (séparées par des virgules)</label>
+                                        <input type="text" class="form-control" id="attrValues" placeholder="64 GB, 128 GB">
+                                        <div class="form-text d-none" id="attrValuesHint">
+                                            Les valeurs se modifient directement dans le tableau ci-dessous.
+                                        </div>
+                                    </div>
+                                    <div class="col-md-12 text-end">
+                                        <button type="button" class="btn btn-outline-secondary me-2 d-none"
+                                                id="attrCancelBtn" onclick="cancelEditAttribute()">
+                                            Annuler
+                                        </button>
+                                        <button type="button" class="btn btn-primary" id="attrSaveBtn"
+                                                onclick="saveCategoryAttribute()">
+                                            <i class="bi bi-plus-circle me-2"></i>Ajouter l'attribut
+                                        </button>
+                                    </div>
+                                </form>
+
+                                <hr>
+
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-bordered align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th>Nom</th>
+                                                <th>Type</th>
+                                                <th>Obligatoire</th>
+                                                <th>Valeurs</th>
+                                                <th style="width:160px">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="attributesTableBody">
+                                            <tr>
+                                                <td colspan="5" class="text-center text-muted">Sélectionnez une catégorie pour gérer ses attributs</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Les catégories organisent vos produits et décident de certains
+                            comportements, comme la présence de {{ mot('variantes') | lower }}.
+                            Le métier choisi dans l'onglet « Métier de la boutique » en
+                            propose un jeu de départ.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Métier de la boutique : ce qui adapte l'application au commerce -->
+            <div class="tab-pane fade" id="metier">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0"><i class="bi bi-shop me-2"></i>Métier de la boutique</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Votre métier décide de la façon de compter le stock, des mots employés
+                            à l'écran et des modules affichés. Changer de métier n'efface
+                            rien : les catégories manquantes sont ajoutées, vos produits et
+                            votre historique restent en place.
+                        </p>
+                        <div id="shopProfileAlert"></div>
+                        <div id="shopProfileCurrent" class="mb-3"></div>
+                        <div id="shopProfileList" class="row g-3">
+                            <div class="col-12 text-muted">Chargement…</div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h6 class="mb-1">Modules affichés</h6>
+                                <p class="text-muted small mb-0">
+                                    Votre métier en propose un jeu de départ. Vous pouvez le
+                                    corriger : une boutique de mode qui répare aussi des
+                                    machines garde son atelier. Décocher un module le retire
+                                    du menu, sans rien supprimer de vos données.
+                                </p>
+                            </div>
+                            <button type="button" class="btn btn-primary btn-sm flex-shrink-0 ms-3"
+                                id="saveShopModules">
+                                <i class="bi bi-check2 me-1"></i>Enregistrer
+                            </button>
+                        </div>
+                        <div id="shopModulesList" class="row g-2">
+                            <div class="col-12 text-muted">Chargement…</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Envoi d'e-mails : serveur du commerçant -->
+            <div class="tab-pane fade" id="email">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="m-0"><i class="bi bi-envelope me-2"></i>Envoi d'e-mails</h6>
+                        <span id="emailEtat"></span>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Vos factures et devis partent depuis votre propre adresse,
+                            avec le PDF en pièce jointe. Renseignez le serveur de votre
+                            fournisseur de courrier. Avec Gmail, il faut créer un
+                            <strong>mot de passe d'application</strong> : le mot de passe
+                            habituel est refusé.
+                        </p>
+                        <div id="emailAlerte"></div>
+
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label for="emailHote" class="form-label">Serveur (SMTP)</label>
+                                <input type="text" class="form-control" id="emailHote"
+                                    placeholder="smtp.gmail.com" autocomplete="off">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="emailPort" class="form-label">Port</label>
+                                <input type="number" class="form-control" id="emailPort" value="587">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="emailSecurite" class="form-label">Sécurité</label>
+                                <select class="form-select" id="emailSecurite"></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="emailUtilisateur" class="form-label">Identifiant</label>
+                                <input type="text" class="form-control" id="emailUtilisateur"
+                                    placeholder="boutique@gmail.com" autocomplete="off">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="emailMotDePasse" class="form-label">Mot de passe</label>
+                                <input type="password" class="form-control" id="emailMotDePasse"
+                                    autocomplete="new-password">
+                                <div class="form-text">
+                                    Enregistré chez vous, jamais réaffiché. Laissez tel quel
+                                    pour conserver celui en place.
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="emailExpediteur" class="form-label">Adresse d'expédition</label>
+                                <input type="email" class="form-control" id="emailExpediteur"
+                                    placeholder="boutique@gmail.com" autocomplete="off">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="emailNom" class="form-label">Nom affiché</label>
+                                <input type="text" class="form-control" id="emailNom"
+                                    placeholder="Ma Boutique" autocomplete="off">
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-2 align-items-end mt-4">
+                            <button type="button" class="btn btn-primary" id="emailEnregistrer">
+                                <i class="bi bi-check2 me-1"></i>Enregistrer
+                            </button>
+                            <div class="ms-auto d-flex gap-2 align-items-end">
+                                <div>
+                                    <label for="emailEssai" class="form-label small mb-1">
+                                        Recevoir un essai à
+                                    </label>
+                                    <input type="email" class="form-control form-control-sm"
+                                        id="emailEssai" placeholder="vous@exemple.sn" style="width: 15rem;">
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary" id="emailTester">
+                                    <i class="bi bi-send me-1"></i>Envoyer l'essai
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assistant IA : qui peut demander quoi -->
+            <div class="tab-pane fade" id="assistant">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="m-0"><i class="bi bi-robot me-2"></i>Droits de l'assistant</h6>
+                        <button type="button" class="btn btn-primary btn-sm" id="saveAssistantRights">
+                            <i class="bi bi-check2 me-1"></i>Enregistrer
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Choisissez qui peut demander quoi à l'assistant. Un outil désactivé
+                            devient invisible pour lui : il ne peut plus s'en servir, même si on
+                            le lui demande. Les actions qui modifient vos données ou envoient un
+                            message restent de toute façon soumises à votre confirmation.
+                        </p>
+                        <div id="assistantRightsAlert"></div>
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Ce que l'assistant peut faire</th>
+                                        <th style="width: 16rem;">Qui peut le lui demander</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="assistantRightsBody">
+                                    <tr>
+                                        <td colspan="2" class="text-muted">Chargement…</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sauvegarde -->
+            <div class="tab-pane fade" id="backup">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="m-0">
+                            <i class="bi bi-cloud-download me-2"></i>Sauvegarde de la base de données
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            La sauvegarde inclut <strong>toutes vos données</strong> : base de données complète (produits, factures, clients, créances…) + tous les fichiers uploadés (images produits, PDFs fournisseurs, signatures, etc.).
+                            Le fichier généré est une archive <code>.zip</code> contenant le dump PostgreSQL et le dossier <code>uploads/</code>.
+                        </div>
+
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="card border-success h-100">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-success">
+                                            <i class="bi bi-download me-2"></i>Télécharger une sauvegarde
+                                        </h6>
+                                        <p class="text-muted small">Génère un dump complet PostgreSQL de toutes vos données et le télécharge sur votre ordinateur.</p>
+                                        <button id="createBackupBtn" class="btn btn-success" onclick="createBackup()">
+                                            <i class="bi bi-download me-2"></i>Télécharger la sauvegarde
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card border-secondary h-100">
+                                    <div class="card-body">
+                                        <h6 class="card-title text-secondary">
+                                            <i class="bi bi-terminal me-2"></i>Restaurer manuellement
+                                        </h6>
+                                        <p class="text-muted small">Décompressez le zip, puis restaurez la BDD et les fichiers :</p>
+                                        <pre class="bg-light rounded p-2 small text-break" style="font-size:0.75rem">unzip stock_backup_*.zip
+pg_restore -U stock -d stock \
+  --clean database/stock_*.dump
+cp -r uploads/ /opt/stockv2/static/uploads/</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Utilisateur -->
+<div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-person-plus me-2"></i>Nouvel Utilisateur
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <div class="mb-3">
+                        <label for="userName" class="form-label">Nom d'utilisateur *</label>
+                        <input type="text" class="form-control" id="userName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="userEmail">
+                    </div>
+                    <div class="mb-3">
+                        <label for="userPassword" class="form-label">Mot de passe *</label>
+                        <input type="password" class="form-control" id="userPassword" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userRole" class="form-label">Rôle *</label>
+                        <select class="form-select" id="userRole" required>
+                            <option value="">Sélectionner un rôle</option>
+                            <option value="user">Utilisateur</option>
+                            <option value="manager">Manager</option>
+                            <option value="admin">Administrateur</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="saveUser()">
+                    <i class="bi bi-check-circle me-2"></i>Créer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Confirmation Suppression Catégorie -->
+<div class="modal fade" id="deleteCategoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Confirmer la suppression
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Êtes-vous sûr de vouloir supprimer la catégorie <strong id="categoryToDelete"></strong> ?</p>
+                <p class="text-danger">Cette action est irréversible et pourrait affecter les produits associés à cette catégorie.</p>
+                <input type="hidden" id="deleteCategoryId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDeleteCategory()">
+                    <i class="bi bi-trash me-2"></i>Supprimer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/settings.js?v={{ ASSET_VERSION() }}"></script>
+<script src="{{ URL_PREFIX }}/static/js/assistant-rights.js?v={{ ASSET_VERSION() }}"></script>
+<script src="{{ URL_PREFIX }}/static/js/shop-profile.js?v={{ ASSET_VERSION() }}"></script>
+<script src="{{ URL_PREFIX }}/static/js/email-settings.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}

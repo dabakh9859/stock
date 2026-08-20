@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <!-- Préfixe de montage de l'application (gabarit autonome : il n'hérite pas de
+       base.html, la définition est donc reprise ici). Vide en production, "/v2"
+       sur la copie de recette. -->
+  <script>
+    window.URL_PREFIX = "{{ URL_PREFIX }}";
+    window.appPath = function (path) {
+      if (typeof path !== "string" || !path.startsWith("/")) return path;
+      return window.URL_PREFIX + path;
+    };
+  </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% set gs = global_settings or {} %}
+    {% set comp = gs.company if gs.company is defined else {} %}
+    {% set name_val = gs.name or gs.company_name or (comp.companyName if comp is defined else None) or (comp.name if comp is defined else None) or 'Stock' %}
+    <title>Connexion - {{ name_val }}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+
+    <!-- Thème posé avant le premier rendu, comme sur le reste de l'application. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('stockflow-theme');
+          document.documentElement.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
+
+    <!-- Mêmes polices et mêmes tokens que le reste de l'application -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,450;14..32,500;14..32,600;14..32,700&display=swap"
+      rel="stylesheet">
+    <link href="{{ URL_PREFIX }}/static/css/style.css?v={{ ASSET_VERSION() }}" rel="stylesheet">
+
+    <style>
+        /* Écran de connexion : même grammaire que l'application — surface basse,
+           carte à filet fin, pastille de marque, action principale claire. */
+        body {
+            background-color: hsl(var(--background));
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        /* Halo très diffus derrière la carte : sur un fond aussi uniforme, il
+           donne un point de fixation sans introduire de couleur. */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(60rem 30rem at 50% -10%, hsl(var(--foreground) / 0.05), transparent 70%);
+            pointer-events: none;
+        }
+
+        .login-card {
+            position: relative;
+            background-color: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            max-width: 22rem;
+            width: 100%;
+        }
+
+        .login-header {
+            padding: 2rem 1.75rem 0;
+            text-align: center;
+        }
+
+        /* Pastille de marque, identique à celle de la barre latérale. */
+        .login-mark {
+            display: grid;
+            place-items: center;
+            width: 2.5rem;
+            height: 2.5rem;
+            margin: 0 auto;
+            border-radius: var(--radius);
+            background-color: hsl(var(--primary));
+            color: hsl(var(--primary-foreground));
+            font-size: 1.125rem;
+            overflow: hidden;
+        }
+
+        .login-mark img { width: 100%; height: 100%; object-fit: cover; }
+
+        .login-title {
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+            font-size: 1.25rem;
+            color: hsl(var(--foreground));
+            margin: 1rem 0 0;
+        }
+
+        .login-subtitle {
+            font-size: 0.8125rem;
+            color: hsl(var(--muted-foreground));
+            margin: 0.375rem 0 0;
+        }
+
+        .login-body { padding: 1.5rem 1.75rem 1.75rem; }
+
+        .btn-login {
+            padding: 0.5625rem 1.25rem;
+            font-size: 0.875rem;
+            width: 100%;
+        }
+
+        .login-theme {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            display: grid;
+            place-items: center;
+            /* 2,5 rem au doigt : ce gabarit est autonome et ne reçoit pas les
+               règles tactiles de la feuille principale. */
+            width: 2.5rem;
+            height: 2.5rem;
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: hsl(var(--muted-foreground));
+        }
+
+        .login-theme:hover { background-color: hsl(var(--accent)); color: hsl(var(--accent-foreground)); }
+    </style>
+</head>
+<body>
+    <button class="login-theme" type="button" id="themeToggle" aria-label="Changer de thème">
+        <i class="bi bi-moon-stars theme-toggle__dark" aria-hidden="true"></i>
+        <i class="bi bi-sun theme-toggle__light" aria-hidden="true"></i>
+    </button>
+    <div class="login-card">
+        <div class="login-header">
+            {% set _logo = gs.logo or gs.logo_path or (comp.logo if comp is defined else None) %}
+            <span class="login-mark">
+                {% if _logo %}
+                    <img src="{{ _logo | app_path }}" alt="{{ name_val }}" />
+                {% else %}
+                    <i class="bi bi-boxes" aria-hidden="true"></i>
+                {% endif %}
+            </span>
+            <h1 class="login-title">{{ name_val }}</h1>
+            <p class="login-subtitle">Gestion de stock — accès réservé à l'équipe.</p>
+        </div>
+
+        <div class="login-body">
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Nom d'utilisateur</label>
+                    <input type="text" class="form-control" id="username"
+                           placeholder="Nom d'utilisateur" autocomplete="username" required>
+                </div>
+
+                <div class="mb-4">
+                    <label for="password" class="form-label">Mot de passe</label>
+                    <input type="password" class="form-control" id="password"
+                           placeholder="Mot de passe" autocomplete="current-password" required>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-login">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Se connecter
+                    </button>
+                </div>
+            </form>
+
+
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <script>
+        // Sélecteur de thème, mémorisé sous la même clé que l'application.
+        document.getElementById('themeToggle').addEventListener('click', function () {
+            var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+            document.documentElement.setAttribute('data-theme', next);
+            try { localStorage.setItem('stockflow-theme', next); } catch (e) { }
+        });
+
+        // S'assurer que les cookies HttpOnly éventuels sont bien envoyés/reçus
+        if (window.axios) {
+            axios.defaults.withCredentials = true;
+        }
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            
+            // Désactiver le bouton pendant la requête
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Connexion...';
+            
+            try {
+                // appPath() est indispensable ici : cette page charge le vrai axios
+                // depuis le CDN, et non le client http.js qui pose le préfixe seul.
+                const response = await axios.post(appPath('/api/auth/login'), {
+                    username: username,
+                    password: password
+                });
+                
+                // Initialiser l'AuthManager (token en mémoire uniquement)
+                if (window.authManager && typeof window.authManager.setTokenAndUser === 'function') {
+                    window.authManager.setTokenAndUser(response.data.access_token, response.data.user);
+                }
+
+                // Rediriger vers le tableau de bord
+                window.location.replace(appPath('/'));
+                
+            } catch (error) {
+                let errorMessage = 'Erreur de connexion';
+                
+                if (error.response && error.response.data && error.response.data.detail) {
+                    errorMessage = error.response.data.detail;
+                }
+                
+                // Afficher l'erreur
+                showAlert(errorMessage, 'danger');
+                
+                // Réactiver le bouton
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Se connecter';
+            }
+        });
+        
+        function showAlert(message, type = 'info') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            // Insérer l'alerte avant le formulaire
+            const form = document.getElementById('loginForm');
+            form.parentNode.insertBefore(alertDiv, form);
+            
+            // Supprimer automatiquement après 5 secondes
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+        
+    </script>
+</body>
+</html>

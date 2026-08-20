@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Devis {{ quotation.quotation_number }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #000000;
+            --secondary: #666666;
+            --border: #e5e5e5;
+            --bg-light: #f9fafb;
+            --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            font-family: var(--font-main);
+            color: var(--primary);
+            line-height: 1.5;
+            margin: 0;
+            background: #f0f0f0;
+            /* Gray background for web view */
+            font-size: 9pt;
+        }
+
+        /* Print Controls */
+        .print-controls {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: white;
+            padding: 8px 16px;
+            border-radius: 99px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 99px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background: #000;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #333;
+        }
+
+        .btn-secondary {
+            background: #fff;
+            color: #333;
+            border-color: #e5e5e5;
+        }
+
+        .btn-secondary:hover {
+            background: #f5f5f5;
+        }
+
+        /* Paper Sheet */
+        .sheet {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 40px auto;
+            padding: 15mm;
+            /* 15mm margin all around */
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Layout Utility */
+        .flex {
+            display: flex;
+        }
+
+        .flex-col {
+            flex-direction: column;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .items-end {
+            align-items: flex-end;
+        }
+
+        .gap-1 {
+            gap: 4px;
+        }
+
+        .gap-2 {
+            gap: 8px;
+        }
+
+        .gap-4 {
+            gap: 16px;
+        }
+
+        .gap-8 {
+            gap: 32px;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .font-bold {
+            font-weight: 600;
+        }
+
+        .text-sm {
+            font-size: 8.5pt;
+        }
+
+        .text-xs {
+            font-size: 7.5pt;
+        }
+
+        .text-secondary {
+            color: var(--secondary);
+        }
+
+        .uppercase {
+            text-transform: uppercase;
+        }
+
+        .tracking-wide {
+            letter-spacing: 0.05em;
+        }
+
+        /* Header */
+        header {
+            margin-bottom: 40px;
+        }
+
+        .logo-container {
+            height: 100px;
+            display: flex;
+            align-items: center;
+        }
+
+        .logo-img {
+            max-height: 100px;
+            max-width: 250px;
+        }
+
+        .company-name {
+            font-size: 16pt;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        /* Grid Info */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 40px;
+        }
+
+        .bill-to-title {
+            font-size: 8pt;
+            color: var(--secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .client-name {
+            font-size: 11pt;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .client-detail {
+            color: var(--secondary);
+            font-size: 9pt;
+            line-height: 1.4;
+        }
+
+        .meta-group {
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .meta-label {
+            color: var(--secondary);
+            font-size: 8pt;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .meta-value {
+            font-size: 10pt;
+            font-weight: 500;
+        }
+
+        /* Item Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        th {
+            text-align: left;
+            font-size: 8pt;
+            text-transform: uppercase;
+            color: var(--secondary);
+            font-weight: 600;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: top;
+        }
+
+        .col-right {
+            text-align: right;
+        }
+
+        .col-center {
+            text-align: center;
+        }
+
+        .item-title {
+            font-weight: 500;
+            color: #000;
+        }
+
+        .item-desc {
+            font-size: 8pt;
+            color: var(--secondary);
+            margin-top: 2px;
+        }
+
+        /* Totals */
+        .totals-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 40px;
+        }
+
+        .totals-box {
+            width: 280px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 9pt;
+        }
+
+        .total-row.final {
+            border-top: 2px solid #000;
+            margin-top: 8px;
+            padding-top: 12px;
+            font-weight: 700;
+            font-size: 12pt;
+        }
+
+        /* Footer */
+        .terms {
+            margin-top: auto;
+            border-top: 1px solid var(--border);
+            padding-top: 20px;
+        }
+
+        .terms-text {
+            font-size: 8pt;
+            color: var(--secondary);
+            max-width: 80%;
+        }
+
+        .company-footer {
+            margin-top: 20px;
+            font-size: 8pt;
+            color: var(--secondary);
+            display: flex;
+            gap: 20px;
+        }
+
+        /* Signatures */
+        .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+
+        .sign-box {
+            width: 200px;
+            border-top: 1px solid #ccc;
+            padding-top: 8px;
+            font-size: 8pt;
+            color: var(--secondary);
+            text-align: center;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            .print-controls {
+                display: none;
+            }
+
+            .sheet {
+                margin: 0;
+                box-shadow: none;
+                width: 210mm;
+                height: auto;
+                min-height: 297mm;
+            }
+
+            @page {
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Controls -->
+    <div class="print-controls">
+        <a href="{{ URL_PREFIX }}/quotations" class="btn btn-secondary">
+            ← Retour
+        </a>
+        <button onclick="window.print()" class="btn btn-primary">
+            Imprimer
+        </button>
+    </div>
+
+    <div class="sheet">
+        <!-- Header -->
+        <header class="flex justify-between items-end">
+            <div class="logo-container">
+                {% set _logo = settings.logo or settings.logo_path %}
+                {% if _logo %}
+                <img src="{{ _logo | app_path }}" alt="Logo" class="logo-img">
+                {% else %}
+                <div class="company-name">{{ settings.company_name or 'Stock' }}</div>
+                {% endif %}
+            </div>
+            <div class="text-right">
+                <div class="font-bold" style="font-size: 24pt; letter-spacing: -0.03em;">DEVIS</div>
+                <div class="text-secondary text-sm">#{{ quotation.quotation_number }}</div>
+            </div>
+        </header>
+
+        <!-- Info Grid -->
+        <div class="info-grid">
+            <!-- Client Info -->
+            <div>
+                <div class="bill-to-title">Client</div>
+                {% if quotation.client %}
+                <div class="client-name">{{ quotation.client.name }}</div>
+                <div class="client-detail">
+                    {% if quotation.client.contact %}{{ quotation.client.contact }}<br>{% endif %}
+                    {% if quotation.client.phone %}{{ quotation.client.phone }}<br>{% endif %}
+                    {% if quotation.client.email %}{{ quotation.client.email }}<br>{% endif %}
+                </div>
+                {% else %}
+                <div class="client-name">Prospect</div>
+                {% endif %}
+            </div>
+
+            <!-- Meta Info -->
+            <div class="flex flex-col items-end gap-2">
+                <div class="flex justify-between" style="width: 200px;">
+                    <span class="meta-label">Date</span>
+                    <span class="meta-value">{{ quotation.date | format_date }}</span>
+                </div>
+                <div class="flex justify-between" style="width: 200px;">
+                    <span class="meta-label">Validité</span>
+                    <span class="meta-value">{{ quotation.expiry_date | format_date }}</span>
+                </div>
+                <!-- Status (only visual feedback) -->
+                {% if quotation.status == 'accepté' %}
+                <div style="color: #10b981; font-weight: 600; font-size: 8pt; text-transform: uppercase;">
+                    ✓ Devis Accepté
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Désignation</th>
+                    <th class="col-center" style="width: 15%;">Qté</th>
+                    <th class="col-right" style="width: 15%;">P.U.</th>
+                    <th class="col-right" style="width: 20%;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in quotation.items %}
+                {% set pname = item.product_name | default('', true) %}
+                {% if not pname.startswith('[SECTION]') %}
+                <tr>
+                    <td>
+                        <div class="item-title">{{ pname }}</div>
+                        {% if item.description %}
+                        <div class="item-desc">{{ item.description }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="col-center">{{ item.quantity | format_number }}</td>
+                    <td class="col-right">{{ (item.price or 0) | format_cfa }}</td>
+                    <td class="col-right font-bold">{{ (item.total or 0) | format_cfa }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% set display_note = "" %}
+        {% if quotation.external_notes %}
+            {% set display_note = quotation.external_notes %}
+        {% elif quotation.notes %}
+            {# Nettoyage des métadonnées pour les anciens devis #}
+            {% set display_note = quotation.notes | replace_regex('\n?\n?__(SIGNATURE|QUOTE_QTYS|SERIALS)__=.*$', '') %}
+        {% endif %}
+
+        {% if display_note and display_note.strip() %}
+        <div style="margin-bottom: 20px; padding: 10px; background-color: var(--bg-light); border-radius: 4px; border-left: 3px solid var(--primary);">
+            <div style="font-weight: 600; font-size: 8pt; text-transform: uppercase; color: var(--primary); margin-bottom: 4px;">Note</div>
+            <div style="font-size: 9pt; color: var(--primary); white-space: pre-wrap;">{{ display_note }}</div>
+        </div>
+        {% endif %}
+
+        <!-- Totals -->
+        <div class="totals-container">
+            <div class="totals-box">
+                <div class="total-row">
+                    <span class="text-secondary">Sous-total</span>
+                    <span>{{ (quotation.subtotal or 0) | format_cfa }}</span>
+                </div>
+
+                {% if (quotation.tax_rate or 0) > 0 %}
+                <div class="total-row">
+                    <span class="text-secondary">TVA {{ (quotation.tax_rate or 0) | int }}%</span>
+                    <span>{{ (quotation.tax_amount or 0) | format_cfa }}</span>
+                </div>
+                {% endif %}
+
+                <div class="total-row final">
+                    <span>Total Net</span>
+                    <span>{{ (quotation.total or 0) | format_cfa }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Spacer -->
+        <div style="flex-grow: 1;"></div>
+
+        <!-- Signatures (Space for manual signing) -->
+        <div class="signatures">
+            <div class="sign-box">
+                Bon pour accord (Client)<br>
+                <div style="height: 40px;"></div>
+            </div>
+            <div class="sign-box">
+                Signature {{ settings.company_name or 'La Rédaction' }}<br>
+                <div style="height: 40px; position: relative;">
+                    {% if signature_data_url %}
+                    <img src="{{ signature_data_url }}"
+                        style="max-height: 45px; position: absolute; top:0; left: 50%; transform: translateX(-50%);">
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+
+        <!-- Footer -->
+        <div class="terms">
+            <div class="bill-to-title">Conditions de l'offre</div>
+            <div class="terms-text">
+                Ce devis est valable jusqu'au {{ quotation.expiry_date | format_date }}.
+                Les prix sont susceptibles d'évoluer après cette date.
+                Paiement selon les modalités convenues à la commande.
+            </div>
+
+            <div class="company-footer">
+                {% if settings.show_phone or settings.phone %}
+                <div>Tél: <strong>{{ settings.phone }}</strong></div>
+                {% endif %}
+                {% if settings.email %}
+                <div>Email: {{ settings.email }}</div>
+                {% endif %}
+                {% if settings.address %}
+                <div>{{ settings.address }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</body>
+
+</html>

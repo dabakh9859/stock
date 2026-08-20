@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+
+{% block title %}Commandes Boutique - {{ _app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Commandes de la boutique</h1>
+    <p class="page-subtitle">Commandes passées depuis la vitrine en ligne</p>
+  </div>
+  <div class="page-header__actions">
+    <button class="btn btn-outline-secondary" onclick="loadOrders()"><i class="bi bi-arrow-clockwise me-2"></i>Actualiser</button>
+  </div>
+</div>
+
+<div class="row g-3 mb-4" id="statsRow"></div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label small text-muted">Recherche</label>
+        <input type="search" id="searchInput" class="form-control" placeholder="N° commande, client, téléphone…">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small text-muted">Statut</label>
+        <select id="statusFilter" class="form-select">
+          <option value="">Tous les statuts</option>
+          <option value="en attente">En attente</option>
+          <option value="confirmée">Confirmée</option>
+          <option value="en préparation">En préparation</option>
+          <option value="expédiée">Expédiée</option>
+          <option value="livrée">Livrée</option>
+          <option value="annulée">Annulée</option>
+        </select>
+      </div>
+      <div class="col-md-3 d-grid">
+        <button class="btn btn-primary" onclick="loadOrders()"><i class="bi bi-search me-1"></i>Filtrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>Client</th>
+          <th>Articles</th>
+          <th class="text-end">Total</th>
+          <th class="text-center">Paiement</th>
+          <th class="text-center">Statut</th>
+          <th>Date</th>
+          <th class="text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="ordersBody">
+        <tr>
+          <td colspan="8" class="text-center py-5 text-muted">Chargement…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="orderModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="orderModalTitle">Commande</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="orderModalBody"></div>
+      <div class="modal-footer justify-content-between">
+        <!-- Suppression définitive : n'apparaît que sur une commande annulée,
+             et le serveur la refuse de toute façon dans les autres cas. -->
+        <button class="btn btn-outline-danger d-none" id="deleteOrderBtn" onclick="deleteOrder()">
+          <i class="bi bi-trash me-1"></i>Supprimer
+        </button>
+        <div class="ms-auto">
+          <button class="btn btn-outline-dark me-2" id="btnFacturer" onclick="ouvrirFacturation()">
+            <i class="bi bi-receipt me-1"></i>Générer la facture
+          </button>
+          <button class="btn btn-secondary me-2" data-bs-dismiss="modal">Fermer</button>
+          <button class="btn btn-primary" onclick="saveOrder()">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Facturation d'une commande : le choix des exemplaires (IMEI) se fait ici,
+     car une commande boutique ne désigne qu'un produit et une quantité. -->
+<div class="modal fade" id="factureModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Générer la facture</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="factureModalBody"></div>
+      <div class="modal-footer">
+        <div class="form-check me-auto">
+          <input class="form-check-input" type="checkbox" id="avecBonLivraison" checked>
+          <label class="form-check-label small" for="avecBonLivraison">
+            Créer aussi le bon de livraison
+          </label>
+        </div>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-primary" id="btnGenererFacture" onclick="genererFacture()">
+          Générer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let orders = [];
+  let editingId = null;
+
+  const STATUS_CLASS = {
+    'en attente': 'bg-warning text-dark',
+    'confirmée': 'bg-info text-dark',
+    'en préparation': 'bg-primary',
+    'expédiée': 'bg-secondary',
+    'livrée': 'bg-success',
+    'annulée': 'bg-danger',
+  };
+
+  function fmt(n) {
+    return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Number(n || 0)) + ' F';
+  }
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  async function loadStats() {
+    try {
+      const { data } = await axios.get('/api/shop/admin/orders/stats');
+      document.getElementById('statsRow').innerHTML = `
+        <div class="col-6 col-lg-3">
+          <div class="card h-100"><div class="card-body">
+            <div class="small text-muted">Commandes</div>
+            <div class="h4 mb-0">${data.total_orders}</div>
+          </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card h-100"><div class="card-body">
+            <div class="small text-muted">En attente</div>
+            <div class="h4 mb-0 text-warning">${data.pending}</div>
+          </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card h-100"><div class="card-body">
+            <div class="small text-muted">Livrées</div>
+            <div class="h4 mb-0 text-success">${data.by_status['livrée'] || 0}</div>
+          </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card h-100"><div class="card-body">
+            <div class="small text-muted">Chiffre d'affaires</div>
+            <div class="h4 mb-0">${fmt(data.revenue)}</div>
+          </div></div>
+        </div>`;
+    } catch (e) { }
+  }
+
+  async function loadOrders() {
+    const body = document.getElementById('ordersBody');
+    body.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Chargement…</td></tr>';
+
+    const q = new URLSearchParams({ limit: '100' });
+    const search = document.getElementById('searchInput').value.trim();
+    const status = document.getElementById('statusFilter').value;
+    if (search) q.set('search', search);
+    if (status) q.set('status', status);
+
+    try {
+      const { data } = await axios.get(`/api/shop/admin/orders?${q}`);
+      orders = data.orders || [];
+
+      if (!orders.length) {
+        body.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Aucune commande</td></tr>';
+        return;
+      }
+
+      body.innerHTML = orders.map(o => `
+        <tr>
+          <td class="fw-semibold">${escapeHtml(o.order_number)}</td>
+          <td>
+            <div>${escapeHtml(o.customer_name)}</div>
+            <div class="small text-muted">${escapeHtml(o.customer_phone)}</div>
+          </td>
+          <td><span class="badge bg-light text-dark">${o.items.length} article(s)</span></td>
+          <td class="text-end fw-semibold">${fmt(o.total)}</td>
+          <td class="text-center"><span class="small">${escapeHtml(o.payment_status || '—')}</span></td>
+          <td class="text-center">
+            <span class="badge ${STATUS_CLASS[o.status] || 'bg-light text-dark'}">${escapeHtml(o.status)}</span>
+          </td>
+          <td class="small text-muted">${o.created_at ? new Date(o.created_at).toLocaleDateString('fr-FR') : '—'}</td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-outline-primary" onclick="openOrder(${o.order_id})">
+              <i class="bi bi-eye"></i>
+            </button>
+          </td>
+        </tr>`).join('');
+    } catch (e) {
+      body.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-danger">Erreur de chargement</td></tr>';
+    }
+  }
+
+  function openOrder(orderId) {
+    const o = orders.find(x => x.order_id === orderId);
+    if (!o) return;
+    editingId = orderId;
+
+    document.getElementById('orderModalTitle').textContent = `Commande ${o.order_number}`;
+    document.getElementById('orderModalBody').innerHTML = `
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <div class="small text-muted">Client</div>
+          <div class="fw-semibold">${escapeHtml(o.customer_name)}</div>
+          <div class="small">${escapeHtml(o.customer_phone)}</div>
+          ${o.customer_email ? `<div class="small">${escapeHtml(o.customer_email)}</div>` : ''}
+        </div>
+        <div class="col-md-6">
+          <div class="small text-muted">Livraison</div>
+          <div>${escapeHtml(o.delivery_city || '—')}</div>
+          <div class="small">${escapeHtml(o.delivery_address || '')}</div>
+          ${o.customer_reported_at ? `
+            <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small">
+              <i class="bi bi-person-check me-1"></i>
+              <strong>Le client dit avoir reçu sa commande</strong>
+              le ${new Date(o.customer_reported_at).toLocaleString('fr-FR')}.<br>
+              <span class="text-muted">À confirmer avec le livreur : passez le statut à « livrée ».</span>
+            </div>` : ''}
+          ${(o.delivery_lat != null && o.delivery_lng != null) ? `
+            <a class="small d-inline-flex align-items-center gap-1 mt-1"
+               href="https://www.google.com/maps/search/?api=1&query=${o.delivery_lat},${o.delivery_lng}"
+               target="_blank" rel="noopener">
+              <i class="bi bi-geo-alt-fill"></i> Ouvrir le point de livraison
+            </a>` : '<div class="small text-muted fst-italic mt-1">Pas de point sur la carte</div>'}
+
+          <!-- Transmettre la course : adresse, articles, point GPS et surtout
+               s'il faut encaisser. Le numéro est saisi à la volée, ce n'est pas
+               celui du client mais celui du livreur. -->
+          <div class="mt-2">
+            <button type="button" class="btn btn-sm btn-outline-dark" onclick="basculerEnvoiLivreur()">
+              <i class="bi bi-send me-1"></i>Envoyer au livreur
+            </button>
+          </div>
+          <div id="envoiLivreur" class="d-none border rounded p-2 mt-2 bg-light">
+            <label class="form-label small mb-1">Numéro du livreur</label>
+            <input type="tel" id="numeroLivreur" class="form-control form-control-sm mb-2"
+                   placeholder="77 123 45 67" autocomplete="off">
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-sm btn-success" onclick="envoyerFicheLivraison('whatsapp')">
+                <i class="bi bi-whatsapp me-1"></i>WhatsApp
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="envoyerFicheLivraison('sms')">
+                <i class="bi bi-chat-dots me-1"></i>SMS
+              </button>
+              <span id="envoiLivreurEtat" class="small align-self-center"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <table class="table table-sm">
+        <thead><tr><th>Article</th><th class="text-center">Qté</th><th class="text-end">Total</th></tr></thead>
+        <tbody>
+          ${o.items.map(i => `<tr>
+            <td>${escapeHtml(i.product_name)}
+              <div class="small text-muted">${escapeHtml(i.availability_at_order || '')}</div></td>
+            <td class="text-center">${i.quantity}</td>
+            <td class="text-end">${fmt(i.total)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot>
+          <tr><td colspan="2" class="text-end text-muted">Sous-total</td><td class="text-end">${fmt(o.subtotal)}</td></tr>
+          <tr><td colspan="2" class="text-end text-muted">Livraison</td><td class="text-end">${fmt(o.delivery_fee)}</td></tr>
+          <tr class="fw-bold"><td colspan="2" class="text-end">Total</td><td class="text-end">${fmt(o.total)}</td></tr>
+        </tfoot>
+      </table>
+
+      ${o.notes ? `<div class="alert alert-light border"><strong>Note du client :</strong><br>${escapeHtml(o.notes)}</div>` : ''}
+
+      <div class="row g-2">
+        <div class="col-md-4">
+          <label class="form-label small">Statut</label>
+          <select id="editStatus" class="form-select">
+            ${['en attente', 'confirmée', 'en préparation', 'expédiée', 'livrée', 'annulée']
+              .map(s => `<option value="${s}" ${o.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small">Paiement</label>
+          <select id="editPaymentStatus" class="form-select">
+            ${['non payé', 'acompte', 'payé']
+              .map(s => `<option value="${s}" ${o.payment_status === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small">Frais de livraison</label>
+          <input type="number" id="editDeliveryFee" class="form-control" value="${o.delivery_fee || 0}">
+        </div>
+        <div class="col-12">
+          <label class="form-label small">Note interne</label>
+          <textarea id="editInternalNotes" class="form-control" rows="2">${escapeHtml(o.internal_notes || '')}</textarea>
+        </div>
+      </div>`;
+
+    // Le bouton n'a de sens que sur une commande annulée : c'est l'annulation
+    // qui a remis le stock, la suppression ne fait qu'effacer la trace.
+    const btnSuppr = document.getElementById('deleteOrderBtn');
+    btnSuppr.classList.toggle('d-none', o.status !== 'annulée');
+
+    new bootstrap.Modal(document.getElementById('orderModal')).show();
+  }
+
+  async function saveOrder() {
+    if (!editingId) return;
+    const nouveauStatut = document.getElementById('editStatus').value;
+    const o = orders.find(x => x.order_id === editingId);
+
+    /* Passer à « livrée » envoie une note de livraison au client, depuis le
+       WhatsApp de la boutique. Un statut choisi par erreur part donc chez lui
+       et ne se rattrape pas : on demande confirmation, en le disant. */
+    if (nouveauStatut === 'livrée' && o && o.status !== 'livrée') {
+      const tel = o.customer_phone ? ` (${o.customer_phone})` : '';
+      if (!confirm(
+        `Confirmer la livraison de ${o.order_number} ?\n\n`
+        + `Un message WhatsApp de note de livraison partira immédiatement à `
+        + `${o.customer_name || 'ce client'}${tel}.\n\n`
+        + `Vérifiez avec le livreur avant de valider : le message ne peut pas être rappelé.`
+      )) return;
+    }
+
+    try {
+      await axios.put(`/api/shop/admin/orders/${editingId}`, {
+        status: nouveauStatut,
+        payment_status: document.getElementById('editPaymentStatus').value,
+        delivery_fee: parseFloat(document.getElementById('editDeliveryFee').value) || 0,
+        internal_notes: document.getElementById('editInternalNotes').value,
+      });
+      bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide();
+      loadOrders();
+      loadStats();
+    } catch (e) {
+      alert('Erreur lors de l\'enregistrement');
+    }
+  }
+
+  let preparationFacture = null;
+
+  async function ouvrirFacturation() {
+    if (!editingId) return;
+    const corps = document.getElementById('factureModalBody');
+    corps.innerHTML = '<p class="text-muted mb-0">Chargement…</p>';
+    new bootstrap.Modal(document.getElementById('factureModal')).show();
+    try {
+      const { data } = await axios.get(`/api/shop/admin/orders/${editingId}/invoice-preparation`);
+      preparationFacture = data;
+
+      if (data.deja_facturee) {
+        corps.innerHTML = `
+          <div class="alert alert-info mb-0">
+            Cette commande a déjà la facture <strong>${escapeHtml(data.invoice_number)}</strong>.
+            <div class="mt-2 d-flex gap-2">
+              <a class="btn btn-sm btn-outline-dark" target="_blank" href="/invoices/print/${data.invoice_id}">
+                <i class="bi bi-printer me-1"></i>Imprimer la facture
+              </a>
+            </div>
+          </div>`;
+        document.getElementById('btnGenererFacture').classList.add('d-none');
+        return;
+      }
+      document.getElementById('btnGenererFacture').classList.remove('d-none');
+
+      const bloque = data.lignes.some(l => l.manquants);
+      corps.innerHTML = `
+        ${data.client_existant
+          ? `<p class="small text-muted">Client : <strong>${escapeHtml(data.client_existant.name)}</strong> (fiche existante).</p>`
+          : `<p class="small text-muted">Un client « ${escapeHtml(data.customer_name || '')} » sera créé à partir de la commande.</p>`}
+        ${bloque ? '<div class="alert alert-danger py-2 small">Stock insuffisant : il manque des exemplaires disponibles pour au moins une ligne.</div>' : ''}
+        ${data.lignes.map(l => `
+          <div class="border rounded p-2 mb-2">
+            <div class="d-flex justify-content-between">
+              <strong>${escapeHtml(l.product_name)}</strong>
+              <span class="text-muted small">${l.quantity} × ${fmt(l.price)}</span>
+            </div>
+            ${l.requires_variants ? `
+              <div class="small text-muted mt-1">Choisissez ${l.quantity} exemplaire(s) — ${l.variants.length} disponible(s)</div>
+              ${Array.from({ length: l.quantity }, (_, i) => `
+                <select class="form-select form-select-sm mt-1" data-item="${l.item_id}" data-rang="${i}">
+                  <option value="">— exemplaire ${i + 1} —</option>
+                  ${l.variants.map(v => `<option value="${v.variant_id}">${escapeHtml(v.imei_serial)}${v.condition ? ' · ' + escapeHtml(v.condition) : ''}</option>`).join('')}
+                </select>`).join('')}
+            ` : `<div class="small text-muted mt-1">Produit sans ${MOT('variante').toLowerCase()} — stock actuel : ${l.stock}</div>`}
+          </div>`).join('')}
+        ${data.delivery_fee > 0 ? `<p class="small text-muted">Les frais de livraison (${fmt(data.delivery_fee)}) seront ajoutés en ligne « Livraison ».</p>` : ''}
+        <div id="factureErreur" class="text-danger small"></div>`;
+    } catch (e) {
+      corps.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(e.response?.data?.detail || 'Préparation impossible')}</div>`;
+      document.getElementById('btnGenererFacture').classList.add('d-none');
+    }
+  }
+
+  async function genererFacture() {
+    if (!editingId || !preparationFacture) return;
+    const erreur = document.getElementById('factureErreur');
+    erreur.textContent = '';
+
+    // Regrouper les exemplaires choisis par ligne de commande
+    const parLigne = {};
+    document.querySelectorAll('#factureModalBody select[data-item]').forEach(sel => {
+      const id = Number(sel.dataset.item);
+      (parLigne[id] = parLigne[id] || []).push(sel.value ? Number(sel.value) : null);
+    });
+    for (const [id, choix] of Object.entries(parLigne)) {
+      if (choix.some(v => !v)) { erreur.textContent = 'Choisissez un exemplaire pour chaque unité.'; return; }
+      if (new Set(choix).size !== choix.length) { erreur.textContent = 'Le même exemplaire est choisi deux fois.'; return; }
+    }
+
+    const bouton = document.getElementById('btnGenererFacture');
+    bouton.disabled = true; bouton.textContent = 'Génération…';
+    try {
+      const { data } = await axios.post(`/api/shop/admin/orders/${editingId}/invoice`, {
+        lignes: Object.entries(parLigne).map(([id, v]) => ({ item_id: Number(id), variant_ids: v })),
+        creer_bon_livraison: document.getElementById('avecBonLivraison').checked,
+      });
+      document.getElementById('factureModalBody').innerHTML = `
+        <div class="alert alert-success">
+          Facture <strong>${escapeHtml(data.invoice_number)}</strong> créée. Le stock a été déduit.
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-dark" target="_blank" href="/invoices/print/${data.invoice_id}">
+            <i class="bi bi-printer me-1"></i>Imprimer la facture
+          </a>
+          ${data.delivery_note_id ? `
+            <a class="btn btn-outline-dark" target="_blank" href="/delivery-notes/print/${data.delivery_note_id}">
+              <i class="bi bi-truck me-1"></i>Imprimer le bon de livraison
+            </a>` : '<span class="small text-muted align-self-center">Bon de livraison non créé.</span>'}
+        </div>`;
+      bouton.classList.add('d-none');
+      loadOrders();
+    } catch (e) {
+      erreur.textContent = e.response?.data?.detail || 'Génération impossible';
+    } finally {
+      bouton.disabled = false; bouton.textContent = 'Générer';
+    }
+  }
+
+  function basculerEnvoiLivreur() {
+    const bloc = document.getElementById('envoiLivreur');
+    bloc.classList.toggle('d-none');
+    if (!bloc.classList.contains('d-none')) document.getElementById('numeroLivreur').focus();
+  }
+
+  async function envoyerFicheLivraison(canal) {
+    if (!editingId) return;
+    const numero = document.getElementById('numeroLivreur').value.trim();
+    const etat = document.getElementById('envoiLivreurEtat');
+    if (numero.replace(/\D/g, '').length < 9) {
+      etat.className = 'small align-self-center text-danger';
+      etat.textContent = 'Numéro incomplet.';
+      return;
+    }
+    etat.className = 'small align-self-center text-muted';
+    etat.textContent = 'Envoi…';
+    try {
+      const { data } = await axios.post(`/api/shop/admin/orders/${editingId}/send-delivery-point`,
+                                        { phone: numero, canal });
+      etat.className = 'small align-self-center text-success';
+      etat.textContent = `Envoyé par ${data.canal === 'sms' ? 'SMS' : 'WhatsApp'}.`;
+    } catch (e) {
+      etat.className = 'small align-self-center text-danger';
+      etat.textContent = e.response?.data?.detail || 'Envoi impossible.';
+    }
+  }
+
+  async function deleteOrder() {
+    if (!editingId) return;
+    const o = orders.find(x => x.order_id === editingId);
+    const numero = o ? o.order_number : '';
+    if (!confirm(`Supprimer définitivement la commande ${numero} ?\n\nCette action est irréversible : la commande, ses lignes et sa livraison disparaissent.`)) return;
+    try {
+      await axios.delete(`/api/shop/admin/orders/${editingId}`);
+      bootstrap.Modal.getInstance(document.getElementById('orderModal')).hide();
+      loadOrders();
+      loadStats();
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Suppression impossible');
+    }
+  }
+
+  document.getElementById('searchInput').addEventListener('keypress', e => {
+    if (e.key === 'Enter') loadOrders();
+  });
+
+  loadStats();
+  loadOrders();
+</script>
+{% endblock %}

@@ -1,0 +1,30 @@
+﻿# Surcharge locale, fusionnée automatiquement par `docker compose`.
+# Le fichier de base est la configuration de production (Traefik, localhost) :
+# il ne publie aucun port vers l'hôte et active les intégrations externes.
+#
+# Docker Desktop bloque ici le montage de dossiers Windows (File Sharing non
+# partagé pour ce chemin) : les bind mounts sont donc remplacés par des volumes
+# internes (`!override`). L'image contient déjà le code copié au build — pour
+# voir une modification de CSS ou de gabarit, reconstruire :
+#   docker compose up -d --build app
+# Pour retrouver le rechargement à chaud, partager le dossier du projet dans
+# Docker Desktop > Settings > Resources > File Sharing, puis supprimer les
+# lignes `volumes: !override` ci-dessous.
+services:
+  postgres:
+    volumes: !override
+      - pgdata_local:/var/lib/postgresql/data
+
+  app:
+    ports:
+      - "8000:8000"
+    volumes: !override []
+    environment:
+      GOOGLE_SHEETS_AUTO_SYNC: "false"
+      APP_PUBLIC_URL: "http://localhost:8000"
+      # Assistant d'aide : relayé vers la plateforme (aucune clé d'IA ici).
+      PLATFORM_URL: "http://host.docker.internal:9000"
+      ASSISTANT_GATEWAY_SECRET: "dev-secret-assistant-a-remplacer"
+
+volumes:
+  pgdata_local: {}

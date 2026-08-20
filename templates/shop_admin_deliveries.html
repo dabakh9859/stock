@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block title %}Livraisons Boutique - {{ _app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Livraisons</h1>
+    <p class="page-subtitle">Fiches de livraison rattachées aux commandes de la boutique</p>
+  </div>
+  <div class="page-header__actions">
+    <select id="statusFilter" class="form-select w-auto" onchange="loadDeliveries()">
+      <option value="">Tous les statuts</option>
+      <option value="à planifier">À planifier</option>
+      <option value="planifiée">Planifiée</option>
+      <option value="en cours">En cours</option>
+      <option value="livrée">Livrée</option>
+      <option value="échouée">Échouée</option>
+    </select>
+    <button class="btn btn-outline-secondary" onclick="loadDeliveries()" title="Actualiser"><i class="bi bi-arrow-clockwise"></i></button>
+  </div>
+</div>
+
+<div class="alert alert-light border d-flex align-items-start gap-2 mb-4">
+  <i class="bi bi-info-circle mt-1"></i>
+  <div>Chaque commande crée automatiquement sa fiche de livraison. Passer une livraison à
+    <strong>« livrée »</strong> bascule aussi la commande correspondante.</div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Commande</th>
+          <th>Client</th>
+          <th>Destination</th>
+          <th>Transporteur</th>
+          <th>Prévue le</th>
+          <th class="text-center">Statut</th>
+          <th class="text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="deliveriesBody">
+        <tr>
+          <td colspan="7" class="text-center py-5 text-muted">Chargement…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="deliveryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="deliveryModalTitle">Livraison</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="deliveryModalBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+        <button class="btn btn-primary" onclick="saveDelivery()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let deliveries = [];
+  let editingId = null;
+
+  const STATUS_CLASS = {
+    'à planifier': 'bg-light text-dark',
+    'planifiée': 'bg-info text-dark',
+    'en cours': 'bg-primary',
+    'livrée': 'bg-success',
+    'échouée': 'bg-danger',
+  };
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  async function loadDeliveries() {
+    const body = document.getElementById('deliveriesBody');
+    body.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-muted">Chargement…</td></tr>';
+
+    const status = document.getElementById('statusFilter').value;
+    const q = status ? `?status=${encodeURIComponent(status)}` : '';
+
+    try {
+      const { data } = await axios.get(`/api/shop/admin/deliveries${q}`);
+      deliveries = data || [];
+
+      if (!deliveries.length) {
+        body.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-muted">Aucune livraison</td></tr>';
+        return;
+      }
+
+      body.innerHTML = deliveries.map(d => `
+        <tr>
+          <td class="fw-semibold">${escapeHtml(d.order_number || '—')}</td>
+          <td>
+            <div>${escapeHtml(d.customer_name || '—')}</div>
+            <div class="small text-muted">${escapeHtml(d.customer_phone || '')}</div>
+          </td>
+          <td>
+            <div>${escapeHtml(d.delivery_city || '—')}</div>
+            <div class="small text-muted">${escapeHtml(d.delivery_address || '')}</div>
+          </td>
+          <td class="small">${escapeHtml(d.carrier || '—')}
+            ${d.tracking_number ? `<div class="text-muted">${escapeHtml(d.tracking_number)}</div>` : ''}</td>
+          <td class="small text-muted">
+            ${d.scheduled_date ? new Date(d.scheduled_date).toLocaleDateString('fr-FR') : '—'}</td>
+          <td class="text-center">
+            <span class="badge ${STATUS_CLASS[d.status] || 'bg-light text-dark'}">${escapeHtml(d.status)}</span>
+          </td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-outline-primary" onclick="openDelivery(${d.delivery_id})">
+              <i class="bi bi-pencil"></i>
+            </button>
+          </td>
+        </tr>`).join('');
+    } catch (e) {
+      body.innerHTML = '<tr><td colspan="7" class="text-center py-5 text-danger">Erreur de chargement</td></tr>';
+    }
+  }
+
+  function openDelivery(deliveryId) {
+    const d = deliveries.find(x => x.delivery_id === deliveryId);
+    if (!d) return;
+    editingId = deliveryId;
+
+    const scheduled = d.scheduled_date ? new Date(d.scheduled_date).toISOString().slice(0, 10) : '';
+
+    document.getElementById('deliveryModalTitle').textContent = `Livraison — ${d.order_number || ''}`;
+    document.getElementById('deliveryModalBody').innerHTML = `
+      <div class="mb-3">
+        <label class="form-label">Statut</label>
+        <select id="editStatus" class="form-select">
+          ${['à planifier', 'planifiée', 'en cours', 'livrée', 'échouée']
+            .map(s => `<option value="${s}" ${d.status === s ? 'selected' : ''}>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Transporteur</label>
+          <input id="editCarrier" class="form-control" value="${escapeHtml(d.carrier || '')}">
+        </div>
+        <div class="col-6">
+          <label class="form-label">N° de suivi</label>
+          <input id="editTracking" class="form-control" value="${escapeHtml(d.tracking_number || '')}">
+        </div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-6">
+          <label class="form-label">Date prévue</label>
+          <input type="date" id="editScheduled" class="form-control" value="${scheduled}">
+        </div>
+        <div class="col-6">
+          <label class="form-label">Frais</label>
+          <input type="number" id="editFee" class="form-control" value="${d.delivery_fee || 0}">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Ville</label>
+        <input id="editCity" class="form-control" value="${escapeHtml(d.delivery_city || '')}">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Adresse</label>
+        <textarea id="editAddress" class="form-control" rows="2">${escapeHtml(d.delivery_address || '')}</textarea>
+      </div>
+      <div class="mb-0">
+        <label class="form-label">Notes</label>
+        <textarea id="editNotes" class="form-control" rows="2">${escapeHtml(d.notes || '')}</textarea>
+      </div>`;
+
+    new bootstrap.Modal(document.getElementById('deliveryModal')).show();
+  }
+
+  async function saveDelivery() {
+    if (!editingId) return;
+    const scheduled = document.getElementById('editScheduled').value;
+    const nouveauStatut = document.getElementById('editStatus').value;
+    const d = (typeof deliveries !== 'undefined')
+      ? deliveries.find(x => x.delivery_id === editingId) : null;
+
+    /* Même garde-fou que sur l'écran Commandes : « livrée » déclenche la note
+       de livraison au client, et un message parti ne se rappelle pas. */
+    if (nouveauStatut === 'livrée' && (!d || d.status !== 'livrée')) {
+      const ref = d && d.order_number ? d.order_number : 'cette commande';
+      if (!confirm(
+        `Confirmer la livraison de ${ref} ?\n\n`
+        + `Un message WhatsApp de note de livraison partira immédiatement au client.\n\n`
+        + `Vérifiez avec le livreur avant de valider : le message ne peut pas être rappelé.`
+      )) return;
+    }
+
+    try {
+      await axios.put(`/api/shop/admin/deliveries/${editingId}`, {
+        status: nouveauStatut,
+        carrier: document.getElementById('editCarrier').value,
+        tracking_number: document.getElementById('editTracking').value,
+        delivery_city: document.getElementById('editCity').value,
+        delivery_address: document.getElementById('editAddress').value,
+        notes: document.getElementById('editNotes').value,
+        delivery_fee: parseFloat(document.getElementById('editFee').value) || 0,
+        scheduled_date: scheduled ? new Date(scheduled).toISOString() : null,
+      });
+      bootstrap.Modal.getInstance(document.getElementById('deliveryModal')).hide();
+      loadDeliveries();
+    } catch (e) {
+      alert('Erreur lors de l\'enregistrement');
+    }
+  }
+
+  loadDeliveries();
+</script>
+{% endblock %}

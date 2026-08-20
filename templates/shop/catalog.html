@@ -1,0 +1,166 @@
+{% extends "shop/base.html" %}
+
+{% block title %}Boutique — Stock{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <nav class="crumbs">
+    <a href="/e-commerce">Accueil</a>
+    <span class="sep"></span>
+    <span class="current" id="crumbCurrent">Boutique</span>
+  </nav>
+</div>
+
+<section class="section" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="catalogTitle">Tous les produits</h2>
+      <span style="color:var(--text-mid);font-size:.9rem" id="catalogCount">Chargement…</span>
+    </div>
+
+    <div class="toolbar">
+      <input type="search" class="field grow" id="searchInput" placeholder="Rechercher un produit, une marque…">
+      <select class="field" id="categorySelect">
+        <option value="">Tous les rayons</option>
+      </select>
+      <select class="field" id="sortSelect">
+        <option value="recent">Plus récents</option>
+        <option value="price_asc">Prix croissant</option>
+        <option value="price_desc">Prix décroissant</option>
+        <option value="name">Nom (A→Z)</option>
+      </select>
+    </div>
+
+    <div class="toolbar" id="availabilityChips">
+      <button class="chip active" data-availability="">Tout</button>
+      <button class="chip" data-availability="en stock">En stock</button>
+      <button class="chip" data-availability="sur commande">Sur commande</button>
+    </div>
+
+    <div class="pgrid" id="catalogGrid">
+      {% for _ in range(12) %}<div class="skeleton"></div>{% endfor %}
+    </div>
+
+    <div style="display:flex;justify-content:center;gap:12px;margin-top:44px" id="pager"></div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const params = new URLSearchParams(location.search);
+  const state = {
+    search: params.get('search') || '',
+    category: params.get('category') || '',
+    availability: params.get('availability') || '',
+    sort: params.get('sort') || 'recent',
+    page: parseInt(params.get('page') || '1', 10),
+  };
+
+  const searchInput = document.getElementById('searchInput');
+  const categorySelect = document.getElementById('categorySelect');
+  const sortSelect = document.getElementById('sortSelect');
+
+  searchInput.value = state.search;
+  sortSelect.value = state.sort;
+
+  document.querySelectorAll('#availabilityChips .chip').forEach((chip) => {
+    chip.classList.toggle('active', (chip.dataset.availability || '') === state.availability);
+    chip.addEventListener('click', () => {
+      state.availability = chip.dataset.availability || '';
+      state.page = 1;
+      document.querySelectorAll('#availabilityChips .chip').forEach((c) => c.classList.remove('active'));
+      chip.classList.add('active');
+      load();
+    });
+  });
+
+  let searchTimer;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { state.search = searchInput.value.trim(); state.page = 1; load(); }, 320);
+  });
+  categorySelect.addEventListener('change', () => { state.category = categorySelect.value; state.page = 1; load(); });
+  sortSelect.addEventListener('change', () => { state.sort = sortSelect.value; state.page = 1; load(); });
+
+  // Le sélecteur reprend les rayons déjà chargés par l'en-tête.
+  const waitCategories = setInterval(() => {
+    if (!CATEGORIES.length) return;
+    clearInterval(waitCategories);
+    CATEGORIES.forEach((cat) => {
+      const option = document.createElement('option');
+      option.value = cat.name;
+      option.textContent = `${cat.name} (${cat.count})`;
+      categorySelect.appendChild(option);
+    });
+    categorySelect.value = state.category;
+  }, 120);
+  setTimeout(() => clearInterval(waitCategories), 6000);
+
+  function syncUrl() {
+    const q = new URLSearchParams();
+    if (state.search) q.set('search', state.search);
+    if (state.category) q.set('category', state.category);
+    if (state.availability) q.set('availability', state.availability);
+    if (state.sort !== 'recent') q.set('sort', state.sort);
+    if (state.page > 1) q.set('page', String(state.page));
+    const qs = q.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : location.pathname);
+  }
+
+  async function load() {
+    const grid = document.getElementById('catalogGrid');
+    const pager = document.getElementById('pager');
+    syncUrl();
+
+    const q = new URLSearchParams({ page: String(state.page), limit: '24', sort: state.sort });
+    if (state.search) q.set('search', state.search);
+    if (state.category) q.set('category', state.category);
+    if (state.availability) q.set('availability', state.availability);
+
+    try {
+      const res = await fetch(`/api/shop/products?${q}`);
+      const data = await res.json();
+      const products = data.products || [];
+      const total = data.pagination ? data.pagination.total : products.length;
+
+      const title = state.category || 'Tous les produits';
+      document.getElementById('catalogTitle').textContent = title;
+      document.getElementById('crumbCurrent').textContent = title;
+      document.getElementById('catalogCount').textContent =
+        total === 0 ? 'Aucun produit' : `${total} produit${total > 1 ? 's' : ''}`;
+
+      if (!products.length) {
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+          <div class="icon"><i class="bi bi-search"></i></div>
+          <h3>Aucun produit trouvé</h3>
+          <p>Élargissez votre recherche ou retirez des filtres.</p></div>`;
+        pager.innerHTML = '';
+        return;
+      }
+
+      cacheProducts(products);
+      grid.innerHTML = products.map(productCard).join('');
+      initReveal();
+
+      const pages = data.pagination ? data.pagination.pages : 1;
+      pager.innerHTML = pages <= 1 ? '' : `
+        <button class="btn-outline" ${state.page <= 1 ? 'disabled' : ''} id="prevPage">
+          <i class="bi bi-chevron-left"></i> Précédent</button>
+        <span style="align-self:center;color:var(--text-mid);font-size:.9rem">Page ${state.page} / ${pages}</span>
+        <button class="btn-outline" ${state.page >= pages ? 'disabled' : ''} id="nextPage">
+          Suivant <i class="bi bi-chevron-right"></i></button>`;
+
+      const prev = document.getElementById('prevPage');
+      const next = document.getElementById('nextPage');
+      if (prev) prev.addEventListener('click', () => { state.page--; load(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      if (next) next.addEventListener('click', () => { state.page++; load(); window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    } catch (e) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <div class="icon"><i class="bi bi-wifi-off"></i></div><h3>Chargement impossible</h3></div>`;
+    }
+  }
+
+  load();
+</script>
+{% endblock %}

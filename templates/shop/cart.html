@@ -1,0 +1,219 @@
+{% extends "shop/base.html" %}
+
+{% block title %}Mon panier — Stock{% endblock %}
+
+{% block content %}
+<section class="section" style="padding-top:52px">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <h2>Mon panier</h2>
+        <p id="cartSummaryLine">Chargement…</p>
+      </div>
+    </div>
+
+    <div id="cartEmpty" style="display:none">
+      <div class="empty-state">
+        <div class="icon"><i class="bi bi-bag"></i></div>
+        <h3>Votre panier est vide</h3>
+        <p>Parcourez la boutique et ajoutez vos premiers produits.</p>
+        <a href="/e-commerce/produits" class="btn-solid" style="margin-top:22px">
+          Découvrir la boutique <i class="bi bi-arrow-right"></i>
+        </a>
+      </div>
+    </div>
+
+    <div class="cart-layout" id="cartLayout" style="display:none">
+      <div>
+        <div id="cartRows"></div>
+        <button class="btn-outline" id="clearCartBtn" style="margin-top:22px">
+          <i class="bi bi-trash3"></i> Vider le panier
+        </button>
+      </div>
+
+      <div class="summary">
+        <h3>Finaliser la commande</h3>
+
+        <div class="summary-row"><span>Sous-total</span><span id="subtotalValue">—</span></div>
+        <div class="summary-row"><span>Livraison</span><span id="deliveryValue">—</span></div>
+        <div class="summary-total"><span>Total</span><span id="totalValue">—</span></div>
+
+        <form id="orderForm" style="display:grid;gap:12px">
+          <input class="field" name="customer_name" placeholder="Nom complet *" required>
+          <input class="field" name="customer_phone" placeholder="Téléphone *" required>
+          <input class="field" name="customer_email" type="email" placeholder="Email (optionnel)">
+          <input class="field" name="delivery_city" placeholder="Ville">
+          <textarea class="field" name="delivery_address" rows="2" placeholder="Adresse de livraison"></textarea>
+          <select class="field" name="payment_method">
+            <option value="">Mode de paiement…</option>
+            <option value="Espèces à la livraison">Espèces à la livraison</option>
+            <option value="Wave">Wave</option>
+            <option value="Orange Money">Orange Money</option>
+            <option value="Virement">Virement bancaire</option>
+          </select>
+          <textarea class="field" name="notes" rows="2" placeholder="Une précision sur votre commande ?"></textarea>
+
+          <button type="submit" class="btn-solid" style="width:100%;justify-content:center" id="submitOrder">
+            <i class="bi bi-check2-circle"></i> Valider la commande
+          </button>
+          <p style="font-size:.81rem;color:var(--text-dim);text-align:center;margin:2px 0 0;line-height:1.55">
+            Notre équipe vous rappelle pour confirmer la commande et le délai.
+          </p>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="successPanel" style="display:none">
+  <div class="wrap">
+    <div class="empty-state">
+      <div class="icon" style="color:var(--accent)"><i class="bi bi-check-circle"></i></div>
+      <h3>Commande enregistrée</h3>
+      <p>Merci ! Votre numéro de commande est :</p>
+      <div style="font-size:1.7rem;font-weight:800;letter-spacing:-.03em;margin:16px 0 6px" id="orderNumber"></div>
+      <p style="font-size:.9rem">Conservez-le pour suivre votre commande.</p>
+      <div style="display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:26px">
+        <a href="/e-commerce/suivi" class="btn-solid">Suivre ma commande</a>
+        <a href="/e-commerce/produits" class="btn-outline">Continuer mes achats</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let deliveryFee = 0;
+
+  async function loadDeliveryFee() {
+    try {
+      const res = await fetch('/api/shop/settings');
+      const s = await res.json();
+      deliveryFee = Number(s.delivery_fee_default || 0) || 0;
+    } catch (e) { deliveryFee = 0; }
+  }
+
+  function render() {
+    const cart = getCart();
+    const empty = document.getElementById('cartEmpty');
+    const layout = document.getElementById('cartLayout');
+
+    if (!cart.length) {
+      empty.style.display = '';
+      layout.style.display = 'none';
+      document.getElementById('cartSummaryLine').textContent = 'Aucun article';
+      return;
+    }
+
+    empty.style.display = 'none';
+    layout.style.display = '';
+
+    const count = cart.reduce((s, i) => s + i.quantity, 0);
+    document.getElementById('cartSummaryLine').textContent =
+      `${count} article${count > 1 ? 's' : ''} dans votre panier`;
+
+    document.getElementById('cartRows').innerHTML = cart.map((item) => `
+      <div class="cart-line">
+        <div class="cart-thumb">
+          ${item.image_path
+            ? `<img src="${escapeHtml(item.image_path)}" alt="${escapeHtml(item.name)}">`
+            : '<i class="bi bi-box-seam" style="color:var(--text-dim);font-size:1.4rem"></i>'}
+        </div>
+        <div>
+          <a href="/e-commerce/produit/${item.product_id}" style="font-weight:620;font-size:.96rem;line-height:1.4;display:block;margin-bottom:5px">
+            ${escapeHtml(item.name)}
+          </a>
+          <div style="font-size:.85rem;color:var(--text-mid);margin-bottom:9px">
+            ${availabilityBadge(item.availability)}
+          </div>
+          <div class="qty-mini">
+            <button type="button" data-action="dec" data-id="${item.product_id}">−</button>
+            <span>${item.quantity}</span>
+            <button type="button" data-action="inc" data-id="${item.product_id}">+</button>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:720;font-size:1.02rem;letter-spacing:-.02em">${formatPrice(item.price * item.quantity)}</div>
+          <button type="button" data-action="del" data-id="${item.product_id}"
+            style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:.83rem;margin-top:7px;padding:4px">
+            <i class="bi bi-trash3"></i> Retirer
+          </button>
+        </div>
+      </div>`).join('');
+
+    const subtotal = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+    document.getElementById('subtotalValue').textContent = formatPrice(subtotal);
+    document.getElementById('deliveryValue').textContent = deliveryFee > 0 ? formatPrice(deliveryFee) : 'À convenir';
+    document.getElementById('totalValue').textContent = formatPrice(subtotal + deliveryFee);
+  }
+
+  document.getElementById('cartRows').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    const id = Number(btn.dataset.id);
+    const item = getCart().find((i) => i.product_id === id);
+    if (!item) return;
+
+    if (btn.dataset.action === 'inc') updateCartQuantity(id, item.quantity + 1);
+    if (btn.dataset.action === 'dec') updateCartQuantity(id, item.quantity - 1);
+    if (btn.dataset.action === 'del') updateCartQuantity(id, 0);
+    render();
+  });
+
+  document.getElementById('clearCartBtn').addEventListener('click', () => {
+    clearCart();
+    render();
+    toast('Panier vidé');
+  });
+
+  document.getElementById('orderForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cart = getCart();
+    if (!cart.length) return;
+
+    const btn = document.getElementById('submitOrder');
+    const form = new FormData(e.target);
+    const payload = {
+      customer_name: (form.get('customer_name') || '').trim(),
+      customer_phone: (form.get('customer_phone') || '').trim(),
+      customer_email: (form.get('customer_email') || '').trim() || null,
+      delivery_city: (form.get('delivery_city') || '').trim() || null,
+      delivery_address: (form.get('delivery_address') || '').trim() || null,
+      payment_method: form.get('payment_method') || null,
+      notes: (form.get('notes') || '').trim() || null,
+      items: cart.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+    };
+
+    if (!payload.customer_name || !payload.customer_phone) {
+      toast('Nom et téléphone sont obligatoires', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Envoi…';
+
+    try {
+      const res = await fetch('/api/shop/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Erreur lors de la commande');
+
+      clearCart();
+      document.getElementById('orderNumber').textContent = data.order_number;
+      document.querySelector('.section').style.display = 'none';
+      document.getElementById('successPanel').style.display = '';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      toast(err.message || 'Erreur lors de la commande', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check2-circle"></i> Valider la commande';
+    }
+  });
+
+  (async () => { await loadDeliveryFee(); render(); })();
+</script>
+{% endblock %}

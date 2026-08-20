@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Bannières - Boutique{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Bannières de la boutique</h1>
+    <p class="text-muted mb-0">
+      Photos ou vidéos glissées entre les sections de la page d'accueil du site.
+    </p>
+  </div>
+  <button class="btn btn-primary" onclick="ouvrirFormulaire()">
+    <i class="bi bi-plus-lg me-1"></i>Nouvelle bannière
+  </button>
+</div>
+
+<div class="alert alert-secondary d-flex gap-2 align-items-start">
+  <i class="bi bi-info-circle mt-1"></i>
+  <div>
+    <strong>Une bannière lourde est chargée par chaque visiteur.</strong>
+    Vos clients consultent la boutique au téléphone, souvent en 4G : la limite
+    est fixée à 12 Mo, et une vidéo de 3 Mo bien compressée vaut mieux qu'une de
+    11 Mo. Pour une vidéo, prévoyez une image d'attente — elle s'affiche pendant
+    le chargement, et reste seule visible sur les téléphones qui refusent la
+    lecture automatique.
+    <br>
+    Les vidéos sont lues <strong>sans son</strong> et en boucle : c'est la seule
+    façon qu'un navigateur les démarre tout seul.
+  </div>
+</div>
+
+<div id="listeBannieres" class="d-flex flex-column gap-3">
+  <p class="text-muted">Chargement…</p>
+</div>
+
+<!-- Formulaire de création -->
+<div class="modal fade" id="modaleBanniere" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="formBanniere" onsubmit="envoyer(event)">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-image me-2"></i>Nouvelle bannière</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="typeMedia">Type de média</label>
+              <select class="form-select" id="typeMedia" onchange="majTypeMedia()">
+                <option value="image">Photo</option>
+                <option value="video">Vidéo</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="emplacement">Emplacement dans la page</label>
+              <select class="form-select" id="emplacement"></select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="fichier">
+                Fichier <span id="extensionsAttendues" class="text-muted small"></span>
+              </label>
+              <input type="file" class="form-control" id="fichier" required>
+            </div>
+
+            <div class="col-12 d-none" id="blocPoster">
+              <label class="form-label" for="poster">Image d'attente de la vidéo</label>
+              <input type="file" class="form-control" id="poster" accept=".jpg,.jpeg,.png,.webp,.avif">
+              <div class="form-text">
+                Affichée pendant le chargement, et à la place de la vidéo sur les
+                appareils qui bloquent la lecture automatique.
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="titre">Titre</label>
+              <input type="text" class="form-control" id="titre" maxlength="120">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="soustitre">Sous-titre</label>
+              <input type="text" class="form-control" id="soustitre" maxlength="240">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label" for="libelleLien">Libellé du bouton</label>
+              <input type="text" class="form-control" id="libelleLien" maxlength="60"
+                     placeholder="Découvrir">
+            </div>
+            <div class="col-md-7">
+              <label class="form-label" for="urlLien">Lien du bouton</label>
+              <input type="text" class="form-control" id="urlLien" maxlength="500"
+                     placeholder="/produits?marque=apple">
+              <div class="form-text">
+                Sans lien, la bannière s'affiche mais n'est pas cliquable.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+          <button type="submit" class="btn btn-primary" id="boutonEnvoyer">Créer la bannière</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let emplacements = {};
+
+  function echapper(t) {
+    const d = document.createElement('div');
+    d.textContent = t == null ? '' : String(t);
+    return d.innerHTML;
+  }
+
+  async function charger() {
+    const zone = document.getElementById('listeBannieres');
+    try {
+      const rep = await api.get('/api/shop-admin/banners');
+      emplacements = rep.data.placements || {};
+      rendre(rep.data.banners || []);
+      remplirEmplacements();
+    } catch (e) {
+      zone.innerHTML = `<div class="alert alert-danger">Chargement impossible : ${echapper(e.message)}</div>`;
+    }
+  }
+
+  function remplirEmplacements() {
+    const sel = document.getElementById('emplacement');
+    sel.innerHTML = Object.entries(emplacements)
+      .map(([cle, libelle]) => `<option value="${echapper(cle)}">${echapper(libelle)}</option>`)
+      .join('');
+  }
+
+  function rendre(bannieres) {
+    const zone = document.getElementById('listeBannieres');
+    if (!bannieres.length) {
+      zone.innerHTML = `
+        <div class="card"><div class="card-body text-center py-5">
+          <i class="bi bi-image fs-1 text-muted"></i>
+          <p class="mt-2 mb-0 text-muted">Aucune bannière. La page d'accueil affiche seulement le catalogue.</p>
+        </div></div>`;
+      return;
+    }
+
+    // Groupées par emplacement : c'est ainsi qu'on les lit sur le site.
+    const groupes = {};
+    for (const b of bannieres) (groupes[b.placement] ||= []).push(b);
+
+    zone.innerHTML = Object.entries(groupes).map(([cle, liste]) => `
+      <div class="card">
+        <div class="card-header fw-semibold">${echapper(emplacements[cle] || cle)}</div>
+        <div class="card-body d-flex flex-column gap-3">
+          ${liste.map(carte).join('')}
+        </div>
+      </div>`).join('');
+  }
+
+  function carte(b) {
+    const apercu = b.media_type === 'video'
+      ? `<video src="${echapper(b.media_url)}" muted loop playsinline
+                ${b.poster_url ? `poster="${echapper(b.poster_url)}"` : ''}
+                class="rounded" style="width: 160px; height: 90px; object-fit: cover;"></video>`
+      : `<img src="${echapper(b.media_url)}" alt=""
+              class="rounded" style="width: 160px; height: 90px; object-fit: cover;">`;
+
+    return `
+      <div class="d-flex flex-wrap align-items-center gap-3 border-bottom pb-3">
+        ${apercu}
+        <div class="flex-grow-1 min-w-0">
+          <div class="fw-semibold">${echapper(b.title || '(sans titre)')}</div>
+          <div class="text-muted small">${echapper(b.subtitle || '')}</div>
+          <div class="small mt-1">
+            <span class="badge bg-secondary-subtle text-secondary-emphasis">
+              ${b.media_type === 'video' ? 'Vidéo' : 'Photo'}
+            </span>
+            ${b.link_url
+              ? `<span class="text-muted ms-2">→ ${echapper(b.link_url)}</span>`
+              : '<span class="text-muted ms-2">non cliquable</span>'}
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" ${b.is_active ? 'checked' : ''}
+                   onchange="basculer(${b.id}, this.checked)" id="actif-${b.id}">
+            <label class="form-check-label small" for="actif-${b.id}">Affichée</label>
+          </div>
+          <button class="btn btn-sm btn-outline-danger" onclick="supprimer(${b.id})">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  function majTypeMedia() {
+    const video = document.getElementById('typeMedia').value === 'video';
+    document.getElementById('blocPoster').classList.toggle('d-none', !video);
+    document.getElementById('fichier').accept = video
+      ? '.mp4,.webm'
+      : '.jpg,.jpeg,.png,.webp,.avif';
+    document.getElementById('extensionsAttendues').textContent = video
+      ? '(MP4 ou WebM, 12 Mo maximum)'
+      : '(JPG, PNG, WebP ou AVIF, 12 Mo maximum)';
+  }
+
+  function ouvrirFormulaire() {
+    document.getElementById('formBanniere').reset();
+    majTypeMedia();
+    new bootstrap.Modal(document.getElementById('modaleBanniere')).show();
+  }
+
+  async function envoyer(e) {
+    e.preventDefault();
+    const bouton = document.getElementById('boutonEnvoyer');
+    bouton.disabled = true;
+    bouton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Envoi…';
+
+    const donnees = new FormData();
+    donnees.append('fichier', document.getElementById('fichier').files[0]);
+    const poster = document.getElementById('poster').files[0];
+    if (poster) donnees.append('poster', poster);
+    donnees.append('media_type', document.getElementById('typeMedia').value);
+    donnees.append('placement', document.getElementById('emplacement').value);
+    donnees.append('title', document.getElementById('titre').value);
+    donnees.append('subtitle', document.getElementById('soustitre').value);
+    donnees.append('link_label', document.getElementById('libelleLien').value);
+    donnees.append('link_url', document.getElementById('urlLien').value);
+
+    try {
+      await api.post('/api/shop-admin/banners', donnees);
+      bootstrap.Modal.getInstance(document.getElementById('modaleBanniere')).hide();
+      showSuccess('Bannière créée. Elle apparaît sur le site au prochain chargement.');
+      charger();
+    } catch (err) {
+      const detail = (err.response && err.response.data && err.response.data.detail) || err.message;
+      showError(detail);
+    } finally {
+      bouton.disabled = false;
+      bouton.textContent = 'Créer la bannière';
+    }
+  }
+
+  async function basculer(id, actif) {
+    try {
+      await api.put(`/api/shop-admin/banners/${id}`, { is_active: actif });
+    } catch (e) {
+      showError('Changement impossible');
+      charger();
+    }
+  }
+
+  async function supprimer(id) {
+    if (!await confirmDialog('Supprimer cette bannière ? Le fichier sera effacé du serveur.',
+                             { variant: 'danger', confirmLabel: 'Supprimer' })) return;
+    try {
+      await api.delete(`/api/shop-admin/banners/${id}`);
+      charger();
+    } catch (e) {
+      showError('Suppression impossible');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', charger);
+</script>
+{% endblock %}

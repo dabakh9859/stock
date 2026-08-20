@@ -1,0 +1,67 @@
+# Caddyfile for Stock v2
+# Reverse proxy configuration
+
+# Main domain with automatic HTTPS
+localhost {
+    # Main app reverse proxy
+    reverse_proxy app:8000
+
+    # WhatsApp HTTP API (WAHA) accessible via /waha/api
+    handle_path /waha/* {
+        reverse_proxy waha:3000
+    }
+
+    # Compression
+    encode gzip zstd
+
+    # Cache headers for static files
+    @uploads path /static/uploads/*
+    header @uploads Cache-Control "public, max-age=3600"
+
+    @static {
+        path /static/*
+        not path /static/uploads/*
+    }
+    header @static Cache-Control "public, max-age=31536000, immutable"
+
+    # Logging
+    log {
+        output file /data/access.log
+        format json
+    }
+}
+
+# Fallback for direct IP access or localhost
+:80 {
+    # Main app reverse proxy
+    reverse_proxy app:8000
+
+    # WhatsApp HTTP API (WAHA) accessible via /waha/api
+    handle_path /waha/* {
+        reverse_proxy waha:3000
+    }
+
+    # Compression
+    encode gzip zstd
+
+    # Cache headers for static files
+    @uploads path /static/uploads/*
+    header @uploads Cache-Control "public, max-age=3600"
+
+    @static {
+        path /static/*
+        not path /static/uploads/*
+    }
+    header @static Cache-Control "public, max-age=31536000, immutable"
+
+    # Logging
+    log {
+        output file /data/access-ip.log
+        format json
+    }
+}
+
+# n8n subdomain (optional)
+# n8n.localhost {
+#     reverse_proxy n8n:5678
+# }

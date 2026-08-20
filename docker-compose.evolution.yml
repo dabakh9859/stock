@@ -1,0 +1,39 @@
+# Docker Compose - Evolution API uniquement (mode host network)
+# Les autres services (app, postgres, redis) tournent en natif
+
+services:
+  evolution-api:
+    image: atendai/evolution-api:v2.2.3
+    container_name: stock_evolution
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - SERVER_URL=https://localhost
+      - AUTHENTICATION_API_KEY=CHANGEZ_MOI_cle_evolution
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://stock:CHANGEZ_MOI_mot_de_passe_postgres@localhost:5434/evolution
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
+      - LOG_LEVEL=DEBUG
+      - DEL_INSTANCE=false
+      - QRCODE_LIMIT=10
+      - CONFIG_SESSION_PHONE_CLIENT=Stock
+      - NODE_OPTIONS=--max-old-space-size=512
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://127.0.0.1:6379
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_LOCAL_ENABLED=false
+    volumes:
+      - ./data/evolution_instances:/evolution/instances
+      - ./data/evolution_store:/evolution/store
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s

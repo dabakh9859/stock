@@ -1,0 +1,485 @@
+/**
+ * Styles pour le système de gestion des brouillons
+ */
+
+/* Bouton de fermeture sur le backdrop */
+.draft-backdrop-close {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1056;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(0, 0, 0, 0.1);
+    color: #333;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.draft-backdrop-close:hover {
+    background: #fff;
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Bouton pour sauvegarder manuellement */
+.draft-backdrop-save {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    z-index: 1056;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(25, 135, 84, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.draft-backdrop-save:hover {
+    background: rgba(25, 135, 84, 1);
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Bouton pour afficher les brouillons */
+.draft-backdrop-drafts {
+    position: fixed;
+    top: 140px;
+    right: 20px;
+    z-index: 1056;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(13, 110, 253, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.draft-backdrop-drafts:hover {
+    background: rgba(13, 110, 253, 1);
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Panneau des brouillons */
+.draft-panel {
+    position: fixed;
+    top: 0;
+    right: -400px;
+    width: 400px;
+    height: 100vh;
+    background: white;
+    box-shadow: -4px 0 20px rgba(0, 0, 0, 0.2);
+    z-index: 1057;
+    transition: right 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.draft-panel.show {
+    right: 0;
+}
+
+.draft-panel-header {
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.draft-panel-header h5 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.draft-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+/* Liste des brouillons */
+.draft-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.draft-item {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    transition: all 0.2s ease;
+}
+
+.draft-item:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.draft-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.draft-item-header strong {
+    font-size: 0.95rem;
+    color: #212529;
+}
+
+.draft-item-meta {
+    margin-bottom: 12px;
+}
+
+.draft-item-meta small {
+    font-size: 0.8rem;
+}
+
+.draft-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.draft-item-actions .btn {
+    flex: 1;
+}
+
+/* Notifications toast */
+.draft-toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 1060;
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+    border-left: 4px solid #0d6efd;
+}
+
+.draft-toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.draft-toast-success {
+    border-left-color: #198754;
+    color: #198754;
+}
+
+.draft-toast-error {
+    border-left-color: #dc3545;
+    color: #dc3545;
+}
+
+.draft-toast i {
+    font-size: 1.2rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .draft-panel {
+        width: 100%;
+        right: -100%;
+    }
+    
+    .draft-backdrop-close,
+    .draft-backdrop-save,
+    .draft-backdrop-drafts {
+        width: 45px;
+        height: 45px;
+        font-size: 18px;
+    }
+    
+    .draft-backdrop-close {
+        top: 15px;
+        right: 15px;
+    }
+    
+    .draft-backdrop-save {
+        top: 70px;
+        right: 15px;
+    }
+    
+    .draft-backdrop-drafts {
+        top: 125px;
+        right: 15px;
+    }
+}
+
+/* Animation pour les boutons */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(13, 110, 253, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(13, 110, 253, 0);
+    }
+}
+
+.draft-backdrop-drafts.has-drafts {
+    animation: pulse 2s infinite;
+}
+
+/* Overlay pour le panneau de brouillons */
+.draft-panel-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1056;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.draft-panel-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Badge de compteur de brouillons */
+.draft-count-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: bold;
+    border: 2px solid white;
+}
+
+/* État vide */
+.draft-panel-body p.text-muted {
+    text-align: center;
+    margin-top: 50px;
+    font-size: 0.95rem;
+}
+
+/* Scrollbar personnalisée pour le panneau */
+.draft-panel-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.draft-panel-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.draft-panel-body::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.draft-panel-body::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* ==========================================================================
+   Alignement sur le design de la V3
+
+   Ce fichier est chargé après la feuille de thème : ses valeurs en dur
+   gagnaient sur elle, et le gestionnaire de brouillons restait clair au milieu
+   d'une interface sombre. Tout ce qui suit reprend les tokens `--*` de
+   `style.css`, et suit donc les deux thèmes.
+   ========================================================================== */
+
+/* --- Boutons flottants --------------------------------------------------- */
+
+.draft-backdrop-close,
+.draft-backdrop-save,
+.draft-backdrop-drafts {
+    width: 2.25rem;
+    height: 2.25rem;
+    font-size: 0.9375rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-md);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.draft-backdrop-close,
+.draft-backdrop-drafts {
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+}
+
+.draft-backdrop-close:hover,
+.draft-backdrop-drafts:hover {
+    background: hsl(var(--accent));
+    border-color: hsl(var(--input));
+    color: hsl(var(--accent-foreground));
+    transform: none;
+}
+
+/* Sauvegarder = action principale, donc la pastille claire du thème. */
+.draft-backdrop-save {
+    background: hsl(var(--primary));
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+}
+
+.draft-backdrop-save:hover {
+    background: hsl(var(--primary) / 0.9);
+    border-color: hsl(var(--primary) / 0.9);
+    color: hsl(var(--primary-foreground));
+    transform: none;
+}
+
+/* Les boutons sont empilés : resserrer pour la nouvelle taille. */
+.draft-backdrop-close { top: 1rem; right: 1rem; }
+.draft-backdrop-save { top: 3.75rem; right: 1rem; }
+.draft-backdrop-drafts { top: 6.5rem; right: 1rem; }
+
+/*
+  Sur téléphone, la modale occupe presque toute la largeur : cette colonne de
+  boutons se retrouvait posée sur son en-tête. Mesuré : la croix de fermeture
+  de la modale et celle du gestionnaire de brouillons se superposaient, et
+  `elementFromPoint` renvoyait la seconde — la modale ne pouvait plus être
+  fermée par son propre bouton. Ils passent donc en rangée, en bas à gauche,
+  hors de l'en-tête comme du pied de la modale.
+*/
+@media (max-width: 767.98px) {
+  .draft-backdrop-close,
+  .draft-backdrop-save,
+  .draft-backdrop-drafts {
+    top: auto;
+    right: auto;
+    bottom: 0.75rem;
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .draft-backdrop-close { left: 0.75rem; }
+  .draft-backdrop-save { left: 3.75rem; }
+  .draft-backdrop-drafts { left: 6.75rem; }
+}
+
+/* --- Panneau latéral ----------------------------------------------------- */
+
+.draft-panel {
+    background: hsl(var(--card));
+    border-left: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-lg);
+}
+
+.draft-panel-header {
+    padding: 0 1.25rem;
+    height: var(--topbar-height, 3.5rem);
+    background: transparent;
+    color: hsl(var(--foreground));
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+.draft-panel-header h5 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.draft-panel-body { padding: 1rem; }
+
+.draft-list { gap: 0.625rem; }
+
+.draft-item {
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    border-radius: var(--radius);
+    padding: 0.875rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.draft-item:hover {
+    background: hsl(var(--accent));
+    border-color: hsl(var(--input));
+    transform: none;
+    box-shadow: none;
+}
+
+.draft-item-header strong {
+    font-size: 0.875rem;
+    color: hsl(var(--foreground));
+}
+
+/* --- Notifications ------------------------------------------------------- */
+
+.draft-toast {
+    background: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+    border: 1px solid hsl(var(--border));
+    border-left: 3px solid hsl(var(--info));
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    font-size: 0.8125rem;
+}
+
+.draft-toast-success { border-left-color: hsl(var(--success)); color: hsl(var(--success)); }
+.draft-toast-error { border-left-color: hsl(var(--danger)); color: hsl(var(--danger)); }
+
+/* --- Divers -------------------------------------------------------------- */
+
+.draft-panel-overlay { background: hsl(240 10% 2% / 0.6); }
+
+.draft-count-badge {
+    background: hsl(var(--danger));
+    color: #fff;
+    border: 2px solid hsl(var(--card));
+}
+
+/* Le halo de la pulsation reprend l'accent du thème. */
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 hsl(var(--ring) / 0.5); }
+    70% { box-shadow: 0 0 0 8px hsl(var(--ring) / 0); }
+    100% { box-shadow: 0 0 0 0 hsl(var(--ring) / 0); }
+}
+
+.draft-panel-body::-webkit-scrollbar-track { background: transparent; }
+.draft-panel-body::-webkit-scrollbar-thumb { background: hsl(var(--input)); border-radius: 999px; }
+.draft-panel-body::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }

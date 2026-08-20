@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}Arrivages - {{ _app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Arrivages</h1>
+    <p class="page-subtitle">Marchandise reçue, chiffre d'affaires réalisé et reste à vendre</p>
+  </div>
+  <div class="page-header__actions">
+    <button class="btn btn-primary" onclick="openNewArrival()">
+      <i class="bi bi-plus-lg me-2"></i>Nouvel arrivage
+    </button>
+  </div>
+</div>
+
+<div class="alert alert-info d-flex align-items-start gap-2 mb-4">
+  <i class="bi bi-info-circle mt-1"></i>
+  <div class="small">Chaque arrivage regroupe la marchandise reçue à une date. On y rattache des produits
+    (une quantité, ou des variantes depuis la fiche produit) pour suivre le chiffre d'affaires et le
+    bénéfice réalisés, ainsi que ce qu'il reste à vendre.</div>
+</div>
+
+<!-- Liste -->
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Référence</th>
+          <th>Date</th>
+          <th>Fournisseur</th>
+          <th class="text-center">Produits</th>
+          <th class="text-end">CA réalisé</th>
+          <th class="text-end">Bénéfice</th>
+          <th class="text-center">Restant</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="arrivalsBody">
+        <tr><td colspan="8" class="text-center py-5 text-muted">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer" id="arrivalsPager"></div>
+</div>
+
+<!-- Modal : nouvel arrivage -->
+<div class="modal fade" id="newArrivalModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Nouvel arrivage</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Date d'arrivage *</label>
+            <input type="date" id="arrDate" class="form-control">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Fournisseur</label>
+            <select id="arrSupplier" class="form-select">
+              <option value="">— Aucun —</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Libellé</label>
+          <input type="text" id="arrLabel" class="form-control" placeholder="Ex : Arrivage Chine juillet">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Notes</label>
+          <textarea id="arrNotes" class="form-control" rows="2" placeholder="Facultatif"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-primary" onclick="createArrival()"><i class="bi bi-check-lg me-1"></i>Créer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : détail d'un arrivage -->
+<div class="modal fade" id="arrivalDetailModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-truck me-2"></i><span id="detailTitle">Arrivage</span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="detailBody">
+        <div class="text-center py-5 text-muted">Chargement…</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let suppliersCache = [];
+
+  function fmt(n) {
+    try { return new Intl.NumberFormat('fr-FR').format(Math.round(n || 0)) + ' F'; }
+    catch { return (n || 0) + ' F'; }
+  }
+  function escapeHtml(s) {
+    const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML;
+  }
+  function showToast(message, type) {
+    if (typeof window.showNotification === 'function') return window.showNotification(message, type);
+    console.log(message);
+  }
+  function todayISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  async function loadSuppliers() {
+    try {
+      const { data } = await axios.get('/api/suppliers');
+      suppliersCache = data.items || data || [];
+    } catch (e) { suppliersCache = []; }
+  }
+
+  // Page courante de la liste. Chaque ligne demande un récapitulatif financier
+  // calculé produit par produit : la liste est donc paginée côté serveur, pas
+  // découpée après coup dans le navigateur.
+  let arrivalsPage = 1;
+  const ARRIVALS_PER_PAGE = 25;
+
+  async function loadArrivals(page = arrivalsPage) {
+    arrivalsPage = page;
+    const body = document.getElementById('arrivalsBody');
+    body.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Chargement…</td></tr>';
+    try {
+      const { data } = await axios.get('/api/arrivals', {
+        params: { skip: (page - 1) * ARRIVALS_PER_PAGE, limit: ARRIVALS_PER_PAGE }
+      });
+      const arrivals = data.arrivals || [];
+
+      renderPager('arrivalsPager', {
+        page, pages: data.pages || 1, total: data.total || arrivals.length,
+        onPage: loadArrivals
+      });
+
+      if (!arrivals.length) {
+        body.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-muted">Aucun arrivage. Créez-en un avec « Nouvel arrivage ».</td></tr>';
+        return;
+      }
+      body.innerHTML = arrivals.map(a => {
+        const f = a.financials || {};
+        const profit = f.profit || 0;
+        return `
+        <tr style="cursor:pointer" onclick="openDetail(${a.arrival_id})">
+          <td><span class="fw-semibold">${escapeHtml(a.reference)}</span>
+            ${a.label ? `<div class="small text-muted">${escapeHtml(a.label)}</div>` : ''}</td>
+          <td>${a.arrival_date ? new Date(a.arrival_date).toLocaleDateString('fr-FR') : '—'}</td>
+          <td>${escapeHtml(a.supplier_name || '—')}</td>
+          <td class="text-center">${a.product_count || 0}</td>
+          <td class="text-end fw-semibold">${fmt(f.revenue)}</td>
+          <td class="text-end ${profit >= 0 ? 'text-success' : 'text-danger'}">${fmt(profit)}</td>
+          <td class="text-center">${f.units_remaining || 0} / ${f.units_received || 0}</td>
+          <td class="text-end" onclick="event.stopPropagation()">
+            <button class="btn btn-sm btn-outline-primary" onclick="openDetail(${a.arrival_id})" title="Détails"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteArrival(${a.arrival_id}, '${escapeHtml(a.reference).replace(/'/g, "\\'")}')" title="Supprimer"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch (e) {
+      body.innerHTML = '<tr><td colspan="8" class="text-center py-5 text-danger">Erreur de chargement</td></tr>';
+    }
+  }
+
+  function openNewArrival() {
+    document.getElementById('arrDate').value = todayISO();
+    document.getElementById('arrLabel').value = '';
+    document.getElementById('arrNotes').value = '';
+    const sel = document.getElementById('arrSupplier');
+    sel.innerHTML = '<option value="">— Aucun —</option>' +
+      suppliersCache.map(s => `<option value="${s.supplier_id}">${escapeHtml(s.name)}</option>`).join('');
+    new bootstrap.Modal(document.getElementById('newArrivalModal')).show();
+  }
+
+  async function createArrival() {
+    const payload = {
+      arrival_date: document.getElementById('arrDate').value,
+      supplier_id: document.getElementById('arrSupplier').value || null,
+      label: document.getElementById('arrLabel').value.trim() || null,
+      notes: document.getElementById('arrNotes').value.trim() || null,
+    };
+    if (!payload.arrival_date) { showToast('Indiquez la date d\'arrivage', 'error'); return; }
+    try {
+      await axios.post('/api/arrivals', payload);
+      bootstrap.Modal.getInstance(document.getElementById('newArrivalModal')).hide();
+      showToast('Arrivage créé', 'success');
+      loadArrivals();
+    } catch (e) {
+      showToast((e.response && e.response.data && e.response.data.detail) || 'Erreur', 'error');
+    }
+  }
+
+  async function deleteArrival(id, ref) {
+    if (!confirm(`Supprimer l'arrivage ${ref} ?\nLes produits liés seront détachés (le stock n'est pas modifié).`)) return;
+    try {
+      await axios.delete(`/api/arrivals/${id}`);
+      showToast('Arrivage supprimé', 'success');
+      loadArrivals();
+    } catch (e) { showToast('Erreur lors de la suppression', 'error'); }
+  }
+
+  // ---- Détail -----------------------------------------------------------
+
+  let currentArrivalId = null;
+
+  async function openDetail(id) {
+    currentArrivalId = id;
+    document.getElementById('detailBody').innerHTML = '<div class="text-center py-5 text-muted">Chargement…</div>';
+    new bootstrap.Modal(document.getElementById('arrivalDetailModal')).show();
+    try {
+      const { data } = await axios.get(`/api/arrivals/${id}`);
+      renderDetail(data);
+    } catch (e) {
+      document.getElementById('detailBody').innerHTML = '<div class="text-center py-5 text-danger">Erreur de chargement</div>';
+    }
+  }
+
+  function statTile(label, value, cls) {
+    return `<div class="col-6 col-md-4 col-xl-2">
+      <div class="border border-line rounded-3 p-3 h-100">
+        <div class="text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.04em">${label}</div>
+        <div class="fw-bold ${cls || ''}" style="font-size:1.1rem">${value}</div>
+      </div></div>`;
+  }
+
+  function renderDetail(a) {
+    document.getElementById('detailTitle').textContent = `${a.reference}${a.label ? ' — ' + a.label : ''}`;
+    const f = a.financials || {};
+    const rows = (f.products || []).map(p => `
+      <tr>
+        <td>${escapeHtml(p.name)}
+          <span class="badge ${p.kind === 'variant' ? 'bg-info' : 'bg-secondary'} ms-1">${p.kind === 'variant' ? 'Variantes' : 'Quantité'}</span>
+        </td>
+        <td class="text-center">${p.received}</td>
+        <td class="text-center">${p.sold}</td>
+        <td class="text-center">${p.remaining}</td>
+        <td class="text-end">${fmt(p.revenue)}</td>
+        <td class="text-end ${p.profit >= 0 ? 'text-success' : 'text-danger'}">${fmt(p.profit)}</td>
+      </tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted py-4">Aucun produit rattaché pour l\'instant</td></tr>';
+
+    document.getElementById('detailBody').innerHTML = `
+      <div class="d-flex flex-wrap gap-3 mb-4 small text-muted">
+        <div><i class="bi bi-calendar3 me-1"></i>${a.arrival_date ? new Date(a.arrival_date).toLocaleDateString('fr-FR') : '—'}</div>
+        <div><i class="bi bi-truck me-1"></i>${escapeHtml(a.supplier_name || 'Aucun fournisseur')}</div>
+        ${a.notes ? `<div><i class="bi bi-sticky me-1"></i>${escapeHtml(a.notes)}</div>` : ''}
+      </div>
+
+      <div class="row g-2 mb-4">
+        ${statTile('CA réalisé', fmt(f.revenue))}
+        ${statTile('Coût d\'achat', fmt(f.cost))}
+        ${statTile('Bénéfice', fmt(f.profit), (f.profit || 0) >= 0 ? 'text-success' : 'text-danger')}
+        ${statTile('Reçu', (f.units_received || 0) + ' u.')}
+        ${statTile('Vendu', (f.units_sold || 0) + ' u.')}
+        ${statTile('Restant', (f.units_remaining || 0) + ' u.')}
+      </div>
+
+      <h6 class="mb-2">Produits de l'arrivage</h6>
+      <div class="table-responsive mb-4">
+        <table class="table table-sm align-middle">
+          <thead>
+            <tr><th>PRODUIT</th><th class="text-center">REÇU</th><th class="text-center">VENDU</th>
+                <th class="text-center">RESTANT</th><th class="text-end">CA</th><th class="text-end">BÉNÉFICE</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+
+      <div class="border-top border-line pt-3">
+        <h6 class="mb-2"><i class="bi bi-plus-circle me-1"></i>Rattacher un produit (par quantité)</h6>
+        <p class="small text-muted mb-2">Pour les produits à {{ mot('variantes') | lower }}, le rattachement se fait depuis la fiche produit.</p>
+        <div class="row g-2 align-items-end">
+          <div class="col-md-5">
+            <label class="form-label small">Produit</label>
+            <input type="text" id="linkSearch" class="form-control form-control-sm" list="linkProductList" placeholder="Nom du produit…" autocomplete="off">
+            <datalist id="linkProductList"></datalist>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Quantité reçue</label>
+            <input type="number" id="linkQty" class="form-control form-control-sm" min="1" placeholder="0">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small">Prix d'achat unitaire</label>
+            <input type="number" id="linkCost" class="form-control form-control-sm" min="0" placeholder="Facultatif">
+          </div>
+          <div class="col-md-1">
+            <button class="btn btn-primary btn-sm w-100" onclick="linkProduct()"><i class="bi bi-check-lg"></i></button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Alimente la liste de produits (recherche à la frappe).
+    const search = document.getElementById('linkSearch');
+    let timer = null;
+    search.addEventListener('input', () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const q = search.value.trim();
+        if (q.length < 2) return;
+        try {
+          const { data } = await axios.get('/api/products', { params: { search: q, limit: 10 } });
+          const list = data.items || data || [];
+          document.getElementById('linkProductList').innerHTML =
+            list.map(p => `<option value="${escapeHtml(p.name)}" data-id="${p.product_id}">`).join('');
+          window._linkProducts = list;
+        } catch (e) { /* ignore */ }
+      }, 250);
+    });
+  }
+
+  async function linkProduct() {
+    const name = document.getElementById('linkSearch').value.trim();
+    const qty = parseInt(document.getElementById('linkQty').value, 10);
+    const cost = document.getElementById('linkCost').value;
+    const match = (window._linkProducts || []).find(p => p.name === name);
+    if (!match) { showToast('Choisissez un produit dans la liste', 'error'); return; }
+    if (!Number.isFinite(qty) || qty <= 0) { showToast('Quantité invalide', 'error'); return; }
+    try {
+      const { data } = await axios.post(`/api/arrivals/${currentArrivalId}/items`, {
+        product_id: match.product_id,
+        quantity: qty,
+        purchase_price: cost === '' ? null : parseFloat(cost),
+      });
+      renderDetail(data);
+      loadArrivals();
+      showToast('Produit rattaché', 'success');
+    } catch (e) {
+      showToast((e.response && e.response.data && e.response.data.detail) || 'Erreur', 'error');
+    }
+  }
+
+  (async function init() {
+    await loadSuppliers();
+    loadArrivals();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "shop/base.html" %}
+
+{% block title %}Suivre ma commande — Stock{% endblock %}
+
+{% block content %}
+<section class="section" style="padding-top:60px">
+  <div class="wrap" style="max-width:680px">
+    <div class="section-head" style="justify-content:center;text-align:center">
+      <div>
+        <h2>Suivre ma commande</h2>
+        <p>Saisissez le numéro reçu à la validation de votre commande.</p>
+      </div>
+    </div>
+
+    <form id="trackForm" style="display:flex;gap:11px;flex-wrap:wrap">
+      <input class="field grow" id="orderInput" placeholder="Ex : CMD-2607-0001" required
+        style="text-transform:uppercase">
+      <button type="submit" class="btn-solid"><i class="bi bi-search"></i> Rechercher</button>
+    </form>
+
+    <div id="trackResult" style="margin-top:34px"></div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const STEPS = ['en attente', 'confirmée', 'en préparation', 'expédiée', 'livrée'];
+
+  document.getElementById('trackForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const number = document.getElementById('orderInput').value.trim().toUpperCase();
+    const box = document.getElementById('trackResult');
+    box.innerHTML = '<div class="skeleton" style="height:180px"></div>';
+
+    try {
+      const res = await fetch(`/api/shop/orders/track/${encodeURIComponent(number)}`);
+      if (!res.ok) throw new Error('Commande introuvable');
+      const order = await res.json();
+
+      const isCancelled = order.status === 'annulée';
+      const currentStep = STEPS.indexOf(order.status);
+
+      const timeline = isCancelled
+        ? '<div class="badge badge-out" style="font-size:.85rem;padding:9px 15px">Commande annulée</div>'
+        : STEPS.map((step, i) => {
+            const done = i <= currentStep;
+            return `<div style="display:flex;align-items:center;gap:13px;padding:11px 0">
+              <div style="width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;
+                background:${done ? 'linear-gradient(135deg,var(--gold-400),var(--gold-600))' : 'var(--surface)'};
+                color:${done ? '#fff' : 'var(--text-faint)'};border:1px solid ${done ? 'transparent' : 'var(--border)'};
+                font-size:.75rem">
+                ${done ? '<i class="bi bi-check2"></i>' : i + 1}
+              </div>
+              <span style="text-transform:capitalize;font-weight:${done ? '650' : '450'};
+                color:${done ? 'var(--text)' : 'var(--text-muted)'}">${step}</span>
+            </div>`;
+          }).join('');
+
+      box.innerHTML = `
+        <div class="summary" style="position:static">
+          <h3 style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+            <span>${escapeHtml(order.order_number)}</span>
+            <span style="font-size:.86rem;font-weight:600;color:var(--text-muted)">${formatPrice(order.total)}</span>
+          </h3>
+          <div style="border-top:1px solid var(--border);padding-top:18px;margin-bottom:18px">${timeline}</div>
+          <div style="border-top:1px solid var(--border);padding-top:18px">
+            <h4 style="font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-faint);margin:0 0 13px">
+              Articles
+            </h4>
+            ${order.items.map((i) => `
+              <div class="summary-row">
+                <span>${escapeHtml(i.name)} × ${i.quantity}</span>
+                <span style="color:var(--text);font-weight:600">${formatPrice(i.total)}</span>
+              </div>`).join('')}
+          </div>
+        </div>`;
+    } catch (err) {
+      box.innerHTML = `<div class="empty-state">
+        <div class="icon"><i class="bi bi-question-circle"></i></div>
+        <h3>Commande introuvable</h3>
+        <p>Vérifiez le numéro saisi, ou contactez-nous directement.</p>
+      </div>`;
+    }
+  });
+</script>
+{% endblock %}

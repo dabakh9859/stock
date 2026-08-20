@@ -1,0 +1,270 @@
+/* ==========================================================================
+   Adaptations pour téléphone
+   --------------------------------------------------------------------------
+   Deux corrections qui ne dépendent d'aucune page en particulier, et qui
+   s'appliquent donc à toute l'application :
+
+     1. les modales trop hautes, dont le bas devenait inatteignable ;
+     2. les listes à 6-11 colonnes, illisibles sur 390 px.
+
+   Ce fichier est volontairement séparé de `style.css` : celui-ci est remplacé
+   à chaque mise à jour du design, pas celui-là.
+   ========================================================================== */
+
+
+/* --------------------------------------------------------------------------
+   1. Modales défilables
+   --------------------------------------------------------------------------
+   Bootstrap neutralise le défilement de la page tant qu'une modale est
+   ouverte (`body { overflow: hidden }`). Si la modale dépasse la hauteur de
+   l'écran et que son corps ne défile pas non plus, tout ce qui se trouve en
+   bas — les boutons de validation, en général — devient inaccessible.
+
+   Bootstrap fournit `.modal-dialog-scrollable` pour ce cas, mais il faut
+   l'ajouter à chaque modale : elles sont 56 dans l'application, et aucune ne
+   la porte. On applique donc le même comportement globalement, sur les seuls
+   petits écrans où le problème se pose.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+
+  .modal-dialog {
+    /* `dvh` suit la barre d'adresse des navigateurs mobiles, qui se replie au
+       défilement ; `vh` laisserait le bas de la modale sous cette barre. */
+    max-height: calc(100dvh - 1rem);
+    margin: 0.5rem;
+  }
+
+  .modal-content {
+    max-height: calc(100dvh - 1rem);
+    overflow: hidden;                 /* le défilement appartient au corps */
+  }
+
+  .modal-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* En-tête et pied restent visibles pendant que le corps défile : le bouton
+     de fermeture et les actions ne doivent jamais sortir de l'écran. */
+  .modal-header,
+  .modal-footer {
+    flex-shrink: 0;
+  }
+
+  /* Un pied à plusieurs boutons devient vite plus large que l'écran. */
+  .modal-footer {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .modal-footer > .btn {
+    flex: 1 1 auto;
+  }
+
+  /* Filet de sécurité : quoi qu'il arrive, une modale ne défile pas
+     latéralement. Les tableaux internes gardent leur propre défilement, qui
+     reste contenu dans leur cadre. */
+  .modal-content {
+    max-width: 100%;
+  }
+
+  .modal-body,
+  .modal-footer,
+  .modal-header {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+}
+
+
+/* --------------------------------------------------------------------------
+   1 bis. Pieds de modale surchargés — jusqu'aux tablettes
+   --------------------------------------------------------------------------
+   Bootstrap impose `flex-wrap: nowrap` aux groupes de boutons, pour que leurs
+   bords se joignent. Le pied de « Détails de la Facture » compte neuf actions,
+   soit 676 px de large.
+
+   Or la largeur d'une modale dépend de l'écran : `.modal-lg` ne vaut 800 px
+   qu'à partir de 992 px de large ; en dessous, Bootstrap la plafonne à 500 px.
+   Entre 768 et 991 px — tablette, petit portable — ces neuf boutons débordaient
+   donc de 178 px : WhatsApp, Email et Supprimer sortaient du cadre du popup et
+   se superposaient à ce qui se trouvait derrière.
+
+   Le seuil est fixé à 991,98 px, exactement là où la modale passe à 800 px et
+   retrouve la place nécessaire.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 991.98px) {
+
+  .modal-footer,
+  .modal-body .btn-group {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .modal-footer .btn-group,
+  .modal-body .btn-group {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .modal-footer > .btn,
+  .modal-footer .btn-group > .btn,
+  .modal-body .btn-group > .btn {
+    flex: 1 1 auto;
+  }
+
+  /* Des boutons qui reviennent à la ligne ne forment plus un bloc continu :
+     les coins carrés hérités du groupe joint n'ont plus lieu d'être. */
+  .modal-footer .btn-group > .btn:not(:first-child),
+  .modal-footer .btn-group > .btn:not(:last-child),
+  .modal-body .btn-group > .btn:not(:first-child),
+  .modal-body .btn-group > .btn:not(:last-child) {
+    border-radius: var(--bs-border-radius, 0.375rem);
+  }
+}
+
+
+/* Filet de sécurité à toutes les largeurs : au-delà de 992 px le pied tient
+   dans la modale (798 px pour 800 px disponibles), mais la marge est mince.
+   Autoriser le retour à la ligne ne change rien tant que tout tient, et évite
+   qu'un libellé plus long ne fasse ressortir des boutons hors du cadre. */
+.modal-footer,
+.modal-footer .btn-group {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   2. Listes en fiches empilées
+   --------------------------------------------------------------------------
+   Les listes comptent de 6 à 11 colonnes. Sur 390 px, la table mesure environ
+   945 px : elle défile latéralement et seules les premières colonnes sont
+   visibles — le prix et le stock, que l'on vient précisément consulter,
+   restent hors écran.
+
+   Chaque ligne devient donc une fiche, chaque cellule une paire
+   « intitulé / valeur ». L'intitulé vient de l'en-tête de colonne, recopié
+   dans `data-label` par `js/table-cards.js`.
+
+   La classe `js-card-table` est posée par ce script, et seulement sur les
+   tableaux qui sont réellement des listes : les tableaux de mise en page ou de
+   saisie (lignes d'une facture, par exemple) ne doivent pas être transformés.
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+
+  table.js-card-table thead {
+    display: none;                    /* les intitulés passent dans les cellules */
+  }
+
+  table.js-card-table,
+  table.js-card-table tbody,
+  table.js-card-table tr,
+  table.js-card-table td {
+    display: block;
+    width: 100%;
+  }
+
+  table.js-card-table tr {
+    /* Grille à deux colonnes : elle ne sert qu'au bandeau de tête, où la
+       vignette et le libellé se placent côte à côte au lieu d'être empilés —
+       une fiche produit y gagne près de 80 px de hauteur. Tous les autres
+       champs occupent la largeur entière. */
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 0.85rem;
+    border: 1px solid var(--bs-border-color, rgba(128, 128, 128, 0.25));
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.75rem;
+    background: var(--bs-body-bg, transparent);
+  }
+
+  table.js-card-table td {
+    grid-column: 1 / -1;              /* par défaut : toute la largeur */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 0;
+    padding: 0.3rem 0;
+    text-align: right;
+    white-space: normal;              /* annule les `text-nowrap` du bureau */
+  }
+
+  /* Bandeau de tête : la vignette à gauche, le libellé du produit à sa droite. */
+  table.js-card-table td[data-media] {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  table.js-card-table td[data-media] + td {
+    grid-column: 2;
+    grid-row: 1;
+    justify-content: flex-start;
+    text-align: left;
+    font-weight: 600;
+  }
+
+  /* Dans le bandeau, répéter « Nom » devant le nom n'apprend rien. */
+  table.js-card-table td[data-media] + td::before {
+    content: none;
+  }
+
+  table.js-card-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    opacity: 0.6;
+  }
+
+  /* Cellules sans intitulé : vignette, colonne d'actions, message
+     « aucun résultat » (qui s'étend sur toute la largeur). */
+  table.js-card-table td[data-media]::before,
+  table.js-card-table td[data-actions]::before,
+  table.js-card-table td[colspan]::before {
+    content: none;
+  }
+
+  table.js-card-table td[data-media] {
+    justify-content: flex-start;
+    padding-bottom: 0.6rem;
+  }
+
+  table.js-card-table td[data-actions] {
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding-top: 0.7rem;
+    margin-top: 0.4rem;
+    border-top: 1px solid var(--bs-border-color, rgba(128, 128, 128, 0.18));
+  }
+
+  table.js-card-table td[colspan] {
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* La vignette produit sert de visuel de la fiche, elle mérite mieux que
+     32 px de côté. */
+  table.js-card-table td[data-media] img {
+    width: 64px;
+    height: 64px;
+    object-fit: cover;
+    border-radius: 0.5rem;
+  }
+
+  /* Le conteneur ne défile plus horizontalement : il n'y a plus rien à
+     faire déborder, et un défilement résiduel donnerait l'impression que du
+     contenu est caché. */
+  .table-responsive:has(table.js-card-table) {
+    overflow-x: visible;
+  }
+}

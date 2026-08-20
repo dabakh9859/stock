@@ -1,0 +1,562 @@
+{% extends "base.html" %}
+
+{% block title %}Catalogue Boutique - {{ _app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Catalogue de la boutique</h1>
+    <p class="page-subtitle">Produits publiés sur la vitrine et mises en avant</p>
+  </div>
+  <div class="page-header__actions">
+    <a href="{{ URL_PREFIX }}/e-commerce" target="_blank" class="btn btn-outline-secondary">
+      <i class="bi bi-box-arrow-up-right me-2"></i>Voir le site
+    </a>
+    <button class="btn btn-primary" onclick="openNewShopProduct()">
+      <i class="bi bi-plus-lg me-2"></i>Ajouter un produit
+    </button>
+  </div>
+</div>
+
+<div class="alert alert-info d-flex align-items-start gap-2 mb-4">
+  <i class="bi bi-info-circle mt-1"></i>
+  <div>
+    Les produits affichés sont ceux de la gestion de stock — aucune saisie en double.
+    <strong>La disponibilité est automatique</strong> : en stock si la quantité est positive,
+    <em>sur commande</em> sinon. Un produit n'est « épuisé » que si vous le forcez ici.
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label small text-muted">Recherche</label>
+        <input type="search" id="searchInput" class="form-control" placeholder="Nom, marque, modèle…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Publication</label>
+        <select id="publishedFilter" class="form-select">
+          <option value="">Tous</option>
+          <option value="true">Publiés</option>
+          <option value="false">Non publiés</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">Vedette</label>
+        <select id="featuredFilter" class="form-select">
+          <option value="">Tous</option>
+          <option value="true">En vedette</option>
+          <option value="false">Hors vedette</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-grid">
+        <button class="btn btn-primary" onclick="loadCatalog(1)"><i class="bi bi-search me-1"></i>Filtrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="bulkBar" class="card mb-3 d-none">
+  <div class="card-body py-2 d-flex align-items-center gap-2 flex-wrap">
+    <span class="fw-semibold"><span id="selectedCount">0</span> sélectionné(s)</span>
+    <div class="vr"></div>
+    <button class="btn btn-sm btn-outline-success" onclick="bulkAction('publish')">Publier</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="bulkAction('unpublish')">Dépublier</button>
+    <button class="btn btn-sm btn-outline-warning" onclick="bulkAction('feature')">Mettre en vedette</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="bulkAction('unfeature')">Retirer des vedettes</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th style="width:38px"><input type="checkbox" class="form-check-input" id="selectAll"></th>
+          <th>Produit</th>
+          <th>Catégorie</th>
+          <th class="text-end">Prix</th>
+          <th class="text-center">Stock</th>
+          <th class="text-center">Disponibilité</th>
+          <th class="text-center">Publié</th>
+          <th class="text-center">Vedette</th>
+          <th class="text-center">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="catalogBody">
+        <tr>
+          <td colspan="9" class="text-center py-5 text-muted">Chargement…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="pager" class="d-flex justify-content-center gap-2 mt-4"></div>
+
+<!-- Modal réglages vitrine -->
+<div class="modal fade" id="shopProductModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Réglages vitrine</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="editProductId">
+        <p class="fw-semibold mb-3" id="editProductName"></p>
+
+        <div class="mb-3">
+          <label class="form-label">Disponibilité</label>
+          <select id="editAvailability" class="form-select">
+            <option value="">Automatique (en stock / sur commande)</option>
+            <option value="epuise">Forcer « Épuisé »</option>
+          </select>
+          <div class="form-text">L'automatique suit la quantité en stock. « Épuisé » masque le bouton d'achat.</div>
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Prix boutique</label>
+            <input type="number" id="editShopPrice" class="form-control" placeholder="Prix du stock">
+            <div class="form-text">Vide = prix du stock</div>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Prix maximum</label>
+            <input type="number" id="editShopPriceMax" class="form-control" placeholder="Optionnel">
+            <div class="form-text">Affiche un intervalle</div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Description vitrine</label>
+          <textarea id="editShopDescription" class="form-control" rows="4"
+            placeholder="Vide = description du stock"></textarea>
+        </div>
+
+        <hr>
+        <p class="fw-semibold small text-muted mb-2">PRÉSENTATION VITRINE</p>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Ancien prix (promo)</label>
+            <input type="number" id="editOldPrice" class="form-control" placeholder="Optionnel">
+            <div class="form-text">Barré si &gt; prix actuel</div>
+          </div>
+          <div class="col-3">
+            <label class="form-label">Note</label>
+            <input type="number" step="0.1" min="0" max="5" id="editRating" class="form-control" placeholder="4.8">
+          </div>
+          <div class="col-3">
+            <label class="form-label">Avis</label>
+            <input type="number" min="0" id="editReviews" class="form-control" placeholder="0">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Caractéristiques</label>
+          <textarea id="editSpecs" class="form-control" rows="4"
+            placeholder="Une caractéristique par ligne"></textarea>
+          <div class="form-text">Une par ligne (ex. « 128 Go »).</div>
+        </div>
+
+        <div class="d-flex gap-4 mb-1">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="editIsNew">
+            <label class="form-check-label" for="editIsNew">Badge « Nouveau »</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="editIsBestseller">
+            <label class="form-check-label" for="editIsBestseller">Meilleure vente</label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-primary" onclick="saveShopProduct()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal : ajouter un produit « boutique uniquement » -->
+<div class="modal fade" id="newShopProductModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Nouveau produit boutique</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info d-flex align-items-start gap-2 py-2">
+          <i class="bi bi-info-circle mt-1"></i>
+          <div class="small">Produit vendu <strong>sur commande</strong>, sans stock physique. Il apparaît
+            sur le site mais reste hors de votre inventaire, jusqu'à ce que vous le passiez au stock.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Nom du produit *</label>
+          <input type="text" id="newName" class="form-control" placeholder="Ex : Casque Sony WH-1000XM5">
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Catégorie</label>
+            <input type="text" id="newCategory" class="form-control" list="newCategoryList" placeholder="Ex : Audio">
+            <datalist id="newCategoryList"></datalist>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Marque</label>
+            <input type="text" id="newBrand" class="form-control" placeholder="Ex : Sony">
+          </div>
+        </div>
+
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Prix (FCFA) *</label>
+            <input type="number" id="newPrice" class="form-control" min="0" placeholder="0">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Modèle</label>
+            <input type="text" id="newModel" class="form-control" placeholder="Facultatif">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea id="newDescription" class="form-control" rows="3" placeholder="Facultatif — visible sur la fiche du site"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" for="newPhotos">Photos</label>
+          <input type="file" class="form-control" id="newPhotos" multiple
+                 accept=".jpg,.jpeg,.png,.webp,.avif" onchange="apercuPhotos()">
+          <div class="form-text">
+            La première photo devient l'image principale sur le site. Elles sont
+            converties en AVIF automatiquement.
+          </div>
+          <div id="apercuNouvellesPhotos" class="d-flex flex-wrap gap-2 mt-2"></div>
+        </div>
+
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="newPublished" checked>
+          <label class="form-check-label" for="newPublished">Publier tout de suite sur le site</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-primary" onclick="createShopProduct()">
+          <i class="bi bi-check-lg me-1"></i>Créer
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let currentPage = 1;
+  const selected = new Set();
+
+  function fmt(n) {
+    return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Number(n || 0)) + ' F';
+  }
+
+  function availabilityChip(availability, forced) {
+    if (availability === 'épuisé') {
+      return '<span class="badge bg-secondary">Épuisé' + (forced ? ' (forcé)' : '') + '</span>';
+    }
+    if (availability === 'en stock') return '<span class="badge bg-success">En stock</span>';
+    return '<span class="badge bg-warning text-dark">Sur commande</span>';
+  }
+
+  async function loadCatalog(page = 1) {
+    currentPage = page;
+    const body = document.getElementById('catalogBody');
+    body.innerHTML = '<tr><td colspan="9" class="text-center py-5 text-muted">Chargement…</td></tr>';
+
+    const q = new URLSearchParams({ page: String(page), limit: '50' });
+    const search = document.getElementById('searchInput').value.trim();
+    const published = document.getElementById('publishedFilter').value;
+    const featured = document.getElementById('featuredFilter').value;
+    if (search) q.set('search', search);
+    if (published) q.set('published', published);
+    if (featured) q.set('featured', featured);
+
+    try {
+      const { data } = await axios.get(`/api/shop/admin/products?${q}`);
+      const products = data.products || [];
+      // Conservé pour proposer les catégories existantes à la création.
+      window._catalogRows = products;
+
+      if (!products.length) {
+        body.innerHTML = '<tr><td colspan="9" class="text-center py-5 text-muted">Aucun produit</td></tr>';
+        document.getElementById('pager').innerHTML = '';
+        return;
+      }
+
+      body.innerHTML = products.map(p => `
+        <tr>
+          <td><input type="checkbox" class="form-check-input row-check" value="${p.product_id}"
+              ${selected.has(p.product_id) ? 'checked' : ''}></td>
+          <td>
+            <div class="fw-semibold">
+              ${escapeHtml(p.name)}
+              ${p.shop_only ? '<span class="badge bg-info ms-1" title="Vendu sur commande, hors inventaire">Boutique</span>' : ''}
+            </div>
+            <div class="small text-muted">${escapeHtml(p.brand || '')} ${escapeHtml(p.model || '')}</div>
+          </td>
+          <td><span class="small">${escapeHtml(p.category || '—')}</span></td>
+          <td class="text-end">
+            ${fmt(p.price)}
+            ${p.price_max ? `<div class="small text-muted">→ ${fmt(p.price_max)}</div>` : ''}
+          </td>
+          <td class="text-center">${p.quantity}</td>
+          <td class="text-center">${availabilityChip(p.availability, !!p.availability_override)}</td>
+          <td class="text-center">
+            <div class="form-check form-switch d-flex justify-content-center">
+              <input class="form-check-input" type="checkbox" ${p.is_published ? 'checked' : ''}
+                onchange="toggleField(${p.product_id}, 'is_published', this.checked)">
+            </div>
+          </td>
+          <td class="text-center">
+            <div class="form-check form-switch d-flex justify-content-center">
+              <input class="form-check-input" type="checkbox" ${p.is_featured ? 'checked' : ''}
+                onchange="toggleField(${p.product_id}, 'is_featured', this.checked)">
+            </div>
+          </td>
+          <td class="text-center">
+            <button class="btn btn-sm btn-outline-primary" onclick='openShopProduct(${JSON.stringify(p)})' title="Réglages vitrine">
+              <i class="bi bi-sliders"></i>
+            </button>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ URL_PREFIX }}/e-commerce/produit/${p.product_id}" target="_blank" title="Voir sur le site">
+              <i class="bi bi-eye"></i>
+            </a>
+            ${p.shop_only ? `<button class="btn btn-sm btn-outline-success" onclick="convertToStock(${p.product_id}, '${escapeHtml(p.name).replace(/'/g, "\\'")}')" title="Passer au stock">
+              <i class="bi bi-box-arrow-in-down"></i>
+            </button>` : ''}
+          </td>
+        </tr>`).join('');
+
+      document.querySelectorAll('.row-check').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const id = Number(cb.value);
+          cb.checked ? selected.add(id) : selected.delete(id);
+          refreshBulkBar();
+        });
+      });
+
+      const pages = data.pagination ? data.pagination.pages : 1;
+      document.getElementById('pager').innerHTML = pages <= 1 ? '' : `
+        <button class="btn btn-outline-secondary btn-sm" ${page <= 1 ? 'disabled' : ''}
+          onclick="loadCatalog(${page - 1})">Précédent</button>
+        <span class="align-self-center small text-muted">Page ${page} / ${pages}</span>
+        <button class="btn btn-outline-secondary btn-sm" ${page >= pages ? 'disabled' : ''}
+          onclick="loadCatalog(${page + 1})">Suivant</button>`;
+    } catch (e) {
+      body.innerHTML = '<tr><td colspan="9" class="text-center py-5 text-danger">Erreur de chargement</td></tr>';
+    }
+  }
+
+  function refreshBulkBar() {
+    const bar = document.getElementById('bulkBar');
+    document.getElementById('selectedCount').textContent = selected.size;
+    bar.classList.toggle('d-none', selected.size === 0);
+  }
+
+  document.getElementById('selectAll').addEventListener('change', function () {
+    document.querySelectorAll('.row-check').forEach(cb => {
+      cb.checked = this.checked;
+      const id = Number(cb.value);
+      this.checked ? selected.add(id) : selected.delete(id);
+    });
+    refreshBulkBar();
+  });
+
+  async function toggleField(productId, field, value) {
+    try {
+      await axios.put(`/api/shop/admin/products/${productId}`, { [field]: value });
+      showToast('Enregistré', 'success');
+    } catch (e) {
+      showToast('Erreur lors de l\'enregistrement', 'error');
+      loadCatalog(currentPage);
+    }
+  }
+
+  async function bulkAction(action) {
+    if (!selected.size) return;
+    try {
+      await axios.post('/api/shop/admin/products/bulk', {
+        product_ids: Array.from(selected), action
+      });
+      selected.clear();
+      refreshBulkBar();
+      loadCatalog(currentPage);
+      showToast('Action appliquée', 'success');
+    } catch (e) {
+      showToast('Erreur', 'error');
+    }
+  }
+
+  function openShopProduct(p) {
+    document.getElementById('editProductId').value = p.product_id;
+    document.getElementById('editProductName').textContent = p.name;
+    document.getElementById('editAvailability').value = p.availability_override || '';
+    document.getElementById('editShopPrice').value = p.shop_price ?? '';
+    document.getElementById('editShopPriceMax').value = p.shop_price_max ?? '';
+    document.getElementById('editShopDescription').value = '';
+    document.getElementById('editOldPrice').value = p.old_price ?? '';
+    document.getElementById('editRating').value = p.rating ?? '';
+    document.getElementById('editReviews').value = p.reviews ?? '';
+    document.getElementById('editSpecs').value = (p.specs || []).join('\n');
+    document.getElementById('editIsNew').checked = !!p.is_new;
+    document.getElementById('editIsBestseller').checked = !!p.bestseller;
+    new bootstrap.Modal(document.getElementById('shopProductModal')).show();
+  }
+
+  async function saveShopProduct() {
+    const id = document.getElementById('editProductId').value;
+    const payload = {
+      availability_override: document.getElementById('editAvailability').value || '',
+      shop_price: parseFloat(document.getElementById('editShopPrice').value) || 0,
+      shop_price_max: parseFloat(document.getElementById('editShopPriceMax').value) || 0,
+      shop_description: document.getElementById('editShopDescription').value.trim(),
+      old_price: parseFloat(document.getElementById('editOldPrice').value) || 0,
+      rating: parseFloat(document.getElementById('editRating').value) || 0,
+      reviews_count: parseInt(document.getElementById('editReviews').value) || 0,
+      specs: document.getElementById('editSpecs').value,
+      is_new: document.getElementById('editIsNew').checked,
+      is_bestseller: document.getElementById('editIsBestseller').checked,
+    };
+    try {
+      await axios.put(`/api/shop/admin/products/${id}`, payload);
+      bootstrap.Modal.getInstance(document.getElementById('shopProductModal')).hide();
+      loadCatalog(currentPage);
+      showToast('Réglages enregistrés', 'success');
+    } catch (e) {
+      showToast('Erreur lors de l\'enregistrement', 'error');
+    }
+  }
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function showToast(message, type) {
+    if (typeof window.showNotification === 'function') return window.showNotification(message, type);
+    console.log(message);
+  }
+
+  // ---- Produits « boutique uniquement » --------------------------------------
+
+  function openNewShopProduct() {
+    ['newName', 'newCategory', 'newBrand', 'newModel', 'newPrice', 'newDescription'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('newPhotos').value = '';
+    document.getElementById('apercuNouvellesPhotos').innerHTML = '';
+    document.getElementById('newPublished').checked = true;
+    // Propose les catégories déjà présentes dans le catalogue.
+    const cats = [...new Set((window._catalogRows || []).map(p => p.category).filter(Boolean))].sort();
+    document.getElementById('newCategoryList').innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">`).join('');
+    new bootstrap.Modal(document.getElementById('newShopProductModal')).show();
+  }
+
+  /** Vignettes des photos choisies : on voit ce qu'on s'apprête à envoyer,
+   *  et surtout laquelle deviendra l'image principale. */
+  function apercuPhotos() {
+    const zone = document.getElementById('apercuNouvellesPhotos');
+    const fichiers = [...document.getElementById('newPhotos').files];
+    zone.innerHTML = fichiers.map((f, i) => `
+      <span class="position-relative d-inline-block">
+        <img src="${URL.createObjectURL(f)}" alt=""
+             class="rounded border" style="width: 64px; height: 64px; object-fit: cover;">
+        ${i === 0 ? '<span class="badge bg-primary position-absolute top-0 start-0">1re</span>' : ''}
+      </span>`).join('');
+  }
+
+  async function createShopProduct() {
+    const name = document.getElementById('newName').value.trim();
+    const price = parseFloat(document.getElementById('newPrice').value);
+    if (!name) { showToast('Le nom du produit est requis', 'error'); return; }
+    if (!Number.isFinite(price) || price < 0) { showToast('Indiquez un prix valide', 'error'); return; }
+
+    const payload = {
+      name,
+      price,
+      category: document.getElementById('newCategory').value.trim() || null,
+      brand: document.getElementById('newBrand').value.trim() || null,
+      model: document.getElementById('newModel').value.trim() || null,
+      description: document.getElementById('newDescription').value.trim() || null,
+      is_published: document.getElementById('newPublished').checked,
+    };
+
+    try {
+      const cree = await axios.post('/api/shop/admin/products', payload);
+
+      /*
+        Les photos partent APRÈS la création, et pas avec elle.
+
+        Le produit doit exister avant qu'on puisse lui attacher une image :
+        l'API des photos travaille par identifiant. On enchaîne donc les deux
+        appels. Un échec de photo n'annule pas le produit — il serait absurde
+        de perdre une fiche complète parce qu'une image était trop lourde — mais
+        il est signalé nommément pour qu'on sache laquelle reprendre.
+      */
+      const identifiant = cree.data && (cree.data.product_id || cree.data.id);
+      const photos = [...document.getElementById('newPhotos').files];
+      const echecs = [];
+
+      if (identifiant && photos.length) {
+        for (const photo of photos) {
+          try {
+            const corps = new FormData();
+            corps.append('file', photo);
+            await axios.post(`/api/products/id/${identifiant}/upload-image`, corps);
+          } catch (err) {
+            echecs.push(photo.name);
+          }
+        }
+      }
+
+      bootstrap.Modal.getInstance(document.getElementById('newShopProductModal')).hide();
+      if (echecs.length) {
+        showToast(`Produit ajouté, mais ${echecs.length} photo(s) refusée(s) : ${echecs.join(', ')}`, 'error');
+      } else {
+        showToast(photos.length
+          ? `Produit ajouté avec ${photos.length} photo(s)`
+          : 'Produit ajouté à la boutique', 'success');
+      }
+      loadCatalog(1);
+    } catch (e) {
+      const msg = (e.response && e.response.data && e.response.data.detail) || 'Erreur lors de la création';
+      showToast(msg, 'error');
+    }
+  }
+
+  async function convertToStock(productId, name) {
+    const qtyStr = window.prompt(`Passer « ${name} » au stock.\n\nQuantité reçue en stock :`, '1');
+    if (qtyStr === null) return;
+    const quantity = parseInt(qtyStr, 10);
+    if (!Number.isFinite(quantity) || quantity < 0) { showToast('Quantité invalide', 'error'); return; }
+    try {
+      await axios.post(`/api/shop/admin/products/${productId}/convert-to-stock`, { quantity });
+      showToast('Produit transféré au stock', 'success');
+      loadCatalog(1);
+    } catch (e) {
+      const msg = (e.response && e.response.data && e.response.data.detail) || 'Erreur lors du transfert';
+      showToast(msg, 'error');
+    }
+  }
+
+  document.getElementById('searchInput').addEventListener('keypress', e => {
+    if (e.key === 'Enter') loadCatalog(1);
+  });
+
+  loadCatalog(1);
+</script>
+{% endblock %}

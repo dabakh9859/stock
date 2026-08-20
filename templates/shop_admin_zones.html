@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Zones de livraison - {{ _app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Zones de livraison</h1>
+    <p class="page-subtitle">Frais et délais appliqués au passage de commande</p>
+  </div>
+  <div class="page-header__actions">
+    <button class="btn btn-primary" onclick="openZone()">
+      <i class="bi bi-plus-lg me-2"></i>Nouvelle zone
+    </button>
+  </div>
+</div>
+
+<div class="alert alert-info d-flex align-items-start gap-2 mb-4">
+  <i class="bi bi-info-circle mt-1"></i>
+  <div>Les frais et délais définis ici sont appliqués automatiquement au passage de commande sur le site.</div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Zone</th>
+          <th class="text-end">Frais (FCFA)</th>
+          <th>Délai</th>
+          <th class="text-center">Active</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="zonesBody">
+        <tr><td colspan="5" class="text-center text-muted py-4">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="zoneModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="zoneModalTitle">Nouvelle zone</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="zoneId">
+        <div class="mb-3">
+          <label class="form-label">Nom de la zone</label>
+          <input type="text" id="zoneName" class="form-control" placeholder="Ex. Parcelles Assainies">
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Frais (FCFA)</label>
+            <input type="number" id="zoneFee" class="form-control" value="0" min="0">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Délai</label>
+            <input type="text" id="zoneDelay" class="form-control" placeholder="Ex. 24–48 h">
+          </div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Latitude</label>
+            <input type="number" step="0.000001" id="zoneLat" class="form-control" placeholder="Optionnel">
+          </div>
+          <div class="col-6">
+            <label class="form-label">Longitude</label>
+            <input type="number" step="0.000001" id="zoneLng" class="form-control" placeholder="Optionnel">
+          </div>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="zoneActive" checked>
+          <label class="form-check-label" for="zoneActive">Zone active</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-primary" onclick="saveZone()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  function fmt(n) { return (n || 0).toLocaleString('fr-FR'); }
+  function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function toast(m, t) { if (typeof window.showNotification === 'function') return window.showNotification(m, t); }
+
+  async function loadZones() {
+    try {
+      const { data } = await axios.get('/api/shop/admin/zones');
+      const body = document.getElementById('zonesBody');
+      if (!data.length) { body.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Aucune zone.</td></tr>'; return; }
+      body.innerHTML = data.map(z => `
+        <tr>
+          <td class="fw-semibold">${esc(z.name)}</td>
+          <td class="text-end">${z.fee > 0 ? fmt(z.fee) : '<span class="text-success">Gratuit</span>'}</td>
+          <td>${esc(z.delay)}</td>
+          <td class="text-center">
+            <div class="form-check form-switch d-inline-block">
+              <input class="form-check-input" type="checkbox" ${z.is_active ? 'checked' : ''}
+                onchange="toggleActive(${z.zone_id}, this.checked)">
+            </div>
+          </td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-secondary" onclick='openZone(${JSON.stringify(z)})'><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="deleteZone(${z.zone_id}, '${esc(z.name).replace(/'/g,"")}')"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>`).join('');
+    } catch (e) { toast('Erreur de chargement', 'error'); }
+  }
+
+  function openZone(z) {
+    document.getElementById('zoneModalTitle').textContent = z ? 'Modifier la zone' : 'Nouvelle zone';
+    document.getElementById('zoneId').value = z ? z.zone_id : '';
+    document.getElementById('zoneName').value = z ? z.name : '';
+    document.getElementById('zoneFee').value = z ? z.fee : 0;
+    document.getElementById('zoneDelay').value = z ? (z.delay || '') : '';
+    document.getElementById('zoneLat').value = z && z.lat != null ? z.lat : '';
+    document.getElementById('zoneLng').value = z && z.lng != null ? z.lng : '';
+    document.getElementById('zoneActive').checked = z ? z.is_active : true;
+    new bootstrap.Modal(document.getElementById('zoneModal')).show();
+  }
+
+  async function saveZone() {
+    const id = document.getElementById('zoneId').value;
+    const payload = {
+      name: document.getElementById('zoneName').value.trim(),
+      fee: parseFloat(document.getElementById('zoneFee').value) || 0,
+      delay: document.getElementById('zoneDelay').value.trim(),
+      lat: parseFloat(document.getElementById('zoneLat').value) || null,
+      lng: parseFloat(document.getElementById('zoneLng').value) || null,
+      is_active: document.getElementById('zoneActive').checked,
+    };
+    if (!payload.name) { toast('Le nom est requis', 'error'); return; }
+    try {
+      if (id) await axios.put(`/api/shop/admin/zones/${id}`, payload);
+      else await axios.post('/api/shop/admin/zones', payload);
+      bootstrap.Modal.getInstance(document.getElementById('zoneModal')).hide();
+      loadZones();
+      toast('Zone enregistrée', 'success');
+    } catch (e) { toast('Erreur lors de l\'enregistrement', 'error'); }
+  }
+
+  async function toggleActive(id, val) {
+    try { await axios.put(`/api/shop/admin/zones/${id}`, { is_active: val }); }
+    catch (e) { toast('Erreur', 'error'); loadZones(); }
+  }
+
+  async function deleteZone(id, name) {
+    if (!confirm(`Supprimer la zone « ${name} » ?`)) return;
+    try { await axios.delete(`/api/shop/admin/zones/${id}`); loadZones(); toast('Zone supprimée', 'success'); }
+    catch (e) { toast('Erreur lors de la suppression', 'error'); }
+  }
+
+  loadZones();
+</script>
+{% endblock %}

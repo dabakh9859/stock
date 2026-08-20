@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Client - Détails{% endblock %}
+
+{% block extra_head %}
+<link href="{{ URL_PREFIX }}/static/css/fiches.css?v={{ ASSET_VERSION() }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="fc-entete">
+        <p class="fc-surtitre">Fiche client</p>
+        <h1 class="fc-nom" id="clientNom">…</h1>
+        <div class="fc-coordonnees" id="clientCoordonnees"></div>
+    </div>
+    <div class="page-header__actions">
+        <a id="clientDebtsBtn" class="btn btn-outline-warning"><i class="bi bi-cash-coin me-2"></i>Créances</a>
+        <a href="{{ URL_PREFIX }}/clients" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-2"></i>Retour</a>
+    </div>
+</div>
+
+<div id="clientDetailRoot" class="d-none">
+
+    <!-- Les quatre indicateurs. Seul « Restant dû » se colore, et son libellé
+         porte le sens autant que la couleur. -->
+    <div class="fc-tuiles" id="clientTuiles"></div>
+
+    <div class="row g-3">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-receipt me-2"></i>Factures</h6>
+                    <a id="newInvoiceBtn" class="btn btn-sm btn-primary" href="#"><i class="bi bi-plus me-1"></i>Nouvelle facture</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Date</th>
+                                    <th>Statut</th>
+                                    <th class="text-end">Total</th>
+                                    <th class="text-end">Payé</th>
+                                    <th class="text-end">Reste</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoicesBody">
+                                <tr><td colspan="6" class="text-center py-4 text-muted">Aucune facture</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-credit-card me-2"></i>Dettes</h6>
+                    <a id="manageDebtsBtn" class="btn btn-sm btn-outline-secondary" href="{{ URL_PREFIX }}/debts"><i class="bi bi-gear"></i></a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Échéance</th>
+                                    <th>Statut</th>
+                                    <th class="text-end">Montant</th>
+                                </tr>
+                            </thead>
+                            <tbody id="debtsBody">
+                                <tr><td colspan="4" class="text-center py-4 text-muted">Aucune dette</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="clientDetailLoading" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Chargement...</span></div>
+    <div class="mt-2">Chargement des détails client...</div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/client_detail.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}
+
+

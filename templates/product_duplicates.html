@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}Doublons de produits - Stock{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Doublons de produits</h1>
+    <p class="text-muted mb-0">
+      Regroupez les fiches qui désignent le même appareil pour retrouver un stock lisible.
+      Les <strong>reprises en échange</strong> et les <strong>achats</strong> forment des groupes
+      distincts : ce sont deux stocks différents, l'un d'occasion, l'autre neuf.
+    </p>
+  </div>
+  <button class="btn btn-outline-secondary" onclick="chargerDoublons()">
+    <i class="bi bi-arrow-clockwise me-1"></i>Actualiser
+  </button>
+</div>
+
+<div class="alert alert-secondary d-flex gap-2 align-items-start">
+  <i class="bi bi-info-circle mt-1"></i>
+  <div>
+    <strong>La fiche gardée reçoit tout&nbsp;:</strong> les {{ mot('variantes') | lower }}, le stock,
+    l'historique des ventes, les factures et les devis des autres fiches lui sont rattachés,
+    puis celles-ci sont archivées. La fiche la plus récente est proposée par défaut&nbsp;;
+    vous pouvez en choisir une autre, et corriger son nom au passage.
+    <br>
+    <span class="text-muted">Cette opération est définitive.</span>
+  </div>
+</div>
+
+<div id="listeDoublons" class="d-flex flex-column gap-3">
+  <p class="text-muted">Chargement…</p>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  let groupesDoublons = [];
+
+  function echapper(t) {
+    const d = document.createElement('div');
+    d.textContent = t == null ? '' : String(t);
+    return d.innerHTML;
+  }
+
+  function formaterMontant(v) {
+    return new Intl.NumberFormat('fr-FR').format(Math.round(v || 0)) + ' F CFA';
+  }
+
+  async function chargerDoublons() {
+    const zone = document.getElementById('listeDoublons');
+    zone.innerHTML = '<p class="text-muted">Chargement…</p>';
+    try {
+      const rep = await api.get('/api/products/duplicates');
+      groupesDoublons = rep.data.groupes || [];
+      rendreDoublons(rep.data);
+    } catch (e) {
+      zone.innerHTML = `<div class="alert alert-danger">Impossible de charger les doublons : ${echapper(e.message)}</div>`;
+    }
+  }
+
+  function rendreDoublons(donnees) {
+    const zone = document.getElementById('listeDoublons');
+    if (!groupesDoublons.length) {
+      zone.innerHTML = `
+        <div class="card"><div class="card-body text-center py-5">
+          <i class="bi bi-check2-circle fs-1 text-success"></i>
+          <p class="mt-2 mb-0">Aucun doublon : chaque appareil n'a qu'une fiche.</p>
+        </div></div>`;
+      return;
+    }
+
+    const entete = `
+      <p class="text-muted mb-0">
+        <strong>${donnees.total_groupes}</strong> groupe(s) —
+        <strong>${donnees.total_fiches}</strong> fiches concernées.
+      </p>`;
+
+    zone.innerHTML = entete + groupesDoublons.map((g, i) => carteGroupe(g, i)).join('');
+  }
+
+  function carteGroupe(g, index) {
+    const lignes = g.fiches.map(f => {
+      const choisi = f.product_id === g.suggestion_id;
+      const badgeSource = f.source === 'exchange'
+        ? '<span class="badge bg-warning-subtle text-warning-emphasis">Échange</span>'
+        : `<span class="badge bg-secondary-subtle text-secondary-emphasis">${echapper(f.source || '—')}</span>`;
+      return `
+        <tr>
+          <td>
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="radio" name="garde-${index}"
+                     id="garde-${index}-${f.product_id}" value="${f.product_id}"
+                     ${choisi ? 'checked' : ''}
+                     onchange="majNomPropose(${index})">
+              <label class="form-check-label" for="garde-${index}-${f.product_id}">
+                <span class="fw-semibold">${echapper(f.name)}</span>
+                <span class="text-muted small">#${f.product_id}</span>
+              </label>
+            </div>
+          </td>
+          <td>${badgeSource}</td>
+          <td class="text-muted small">${echapper(f.category || '—')}</td>
+          <td class="text-end">${f.quantity}</td>
+          <td class="text-end">${f.variantes}</td>
+          <td class="text-end">${f.ventes}</td>
+          <td class="text-end text-muted small">${formaterMontant(f.price)}</td>
+        </tr>`;
+    }).join('');
+
+    const suggestion = g.fiches.find(f => f.product_id === g.suggestion_id);
+
+    // Un nom de remplissage désigne presque toujours deux appareils
+    // différents : on affiche le groupe, mais la fusion demande une
+    // confirmation supplémentaire.
+    const avertissement = g.generique ? `
+      <div class="alert alert-warning d-flex gap-2 align-items-start mb-3">
+        <i class="bi bi-exclamation-triangle mt-1"></i>
+        <div>
+          <strong>Ces fiches portent un libellé générique.</strong>
+          Elles désignent probablement des appareils différents saisis sans nom.
+          Les fusionner les confondrait — mieux vaut renommer chaque fiche depuis le stock.
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="force-${index}"
+                   onchange="document.getElementById('fusion-${index}').disabled = !this.checked">
+            <label class="form-check-label" for="force-${index}">
+              Je confirme qu'il s'agit bien du même appareil
+            </label>
+          </div>
+        </div>
+      </div>` : '';
+
+    return `
+      <div class="card" id="groupe-${index}">
+        <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div>
+            <span class="fw-semibold">${echapper(g.libelle)}</span>
+            <span class="badge bg-danger-subtle text-danger-emphasis ms-2">${g.fiches.length} fiches</span>
+            ${g.echange
+              ? '<span class="badge bg-warning-subtle text-warning-emphasis ms-1">Reprises</span>'
+              : '<span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Achats</span>'}
+          </div>
+          <div class="text-muted small">
+            Stock cumulé <strong>${g.stock_total}</strong> ·
+            ${g.variantes_totales} variante(s) ·
+            ${g.ventes_totales} vente(s)
+          </div>
+        </div>
+        <div class="card-body">
+          ${avertissement}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-3">
+              <thead>
+                <tr>
+                  <th>Fiche à garder</th>
+                  <th>Origine</th>
+                  <th>Catégorie</th>
+                  <th class="text-end">Stock</th>
+                  <th class="text-end">Variantes</th>
+                  <th class="text-end">Ventes</th>
+                  <th class="text-end">Prix</th>
+                </tr>
+              </thead>
+              <tbody>${lignes}</tbody>
+            </table>
+          </div>
+
+          <div class="row g-2 align-items-end">
+            <div class="col-md-7">
+              <label class="form-label small mb-1" for="nom-${index}">
+                Nom de la fiche gardée
+              </label>
+              <input type="text" class="form-control" id="nom-${index}"
+                     value="${echapper(suggestion ? suggestion.name : g.libelle)}">
+              <div class="form-text">
+                La fiche la plus récente est souvent saisie à la volée : corrigez son nom ici.
+              </div>
+            </div>
+            <div class="col-md-5 text-md-end">
+              <button class="btn btn-primary" id="fusion-${index}"
+                      ${g.generique ? 'disabled' : ''}
+                      onclick="fusionnerGroupe(${index})">
+                <i class="bi bi-union me-1"></i>Fusionner les ${g.fiches.length} fiches
+              </button>
+            </div>
+          </div>
+          <div id="resultat-${index}" class="mt-3"></div>
+        </div>
+      </div>`;
+  }
+
+  /** Le nom proposé suit la fiche sélectionnée, tant qu'il n'a pas été retouché. */
+  function majNomPropose(index) {
+    const g = groupesDoublons[index];
+    const champ = document.getElementById(`nom-${index}`);
+    const gardeId = Number(document.querySelector(`input[name="garde-${index}"]:checked`).value);
+    const fiche = g.fiches.find(f => f.product_id === gardeId);
+    const nomsConnus = g.fiches.map(f => f.name);
+    if (fiche && nomsConnus.includes(champ.value)) champ.value = fiche.name;
+  }
+
+  async function fusionnerGroupe(index) {
+    const g = groupesDoublons[index];
+    const gardeId = Number(document.querySelector(`input[name="garde-${index}"]:checked`).value);
+    const absorbes = g.fiches.filter(f => f.product_id !== gardeId);
+    const nom = document.getElementById(`nom-${index}`).value.trim();
+
+    const recap = absorbes.map(f => `  • #${f.product_id} ${f.name} (stock ${f.quantity}, ${f.variantes} variante(s), ${f.ventes} vente(s))`).join('\n');
+    const message =
+      `Fusionner ${absorbes.length} fiche(s) dans « ${nom} » (#${gardeId}) ?\n\n` +
+      `Seront rattachés à la fiche gardée :\n${recap}\n\n` +
+      `Stock cumulé après fusion : ${g.stock_total}\n\n` +
+      `Cette opération est définitive.`;
+    if (!confirm(message)) return;
+
+    const bouton = document.getElementById(`fusion-${index}`);
+    bouton.disabled = true;
+    bouton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Fusion…';
+
+    try {
+      const rep = await api.post('/api/products/duplicates/merge', {
+        garde_id: gardeId,
+        absorbes_ids: absorbes.map(f => f.product_id),
+        nom: nom || null
+      });
+      const d = rep.data;
+      const detail = Object.entries(d.detail || {})
+        .map(([k, v]) => `<li>${echapper(k)} : ${v}</li>`).join('');
+      document.getElementById(`resultat-${index}`).innerHTML = `
+        <div class="alert alert-success mb-0">
+          <strong>Fusion effectuée.</strong>
+          « ${echapper(d.garde.name)} » porte désormais un stock de ${d.garde.quantity}
+          (+${d.stock_ajoute}).
+          ${detail ? `<ul class="mb-0 mt-2 small">${detail}</ul>` : ''}
+        </div>`;
+      document.querySelector(`#groupe-${index} .table-responsive`).classList.add('opacity-50');
+      bouton.remove();
+    } catch (e) {
+      const detail = (e.response && e.response.data && e.response.data.detail) || e.message;
+      document.getElementById(`resultat-${index}`).innerHTML =
+        `<div class="alert alert-danger mb-0">Fusion refusée : ${echapper(detail)}</div>`;
+      bouton.disabled = false;
+      bouton.innerHTML = `<i class="bi bi-union me-1"></i>Fusionner les ${g.fiches.length} fiches`;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', chargerDoublons);
+</script>
+{% endblock %}

@@ -1,0 +1,777 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des Factures - Stock{% endblock %}
+
+{% block extra_head %}
+<link href="{{ URL_PREFIX }}/static/css/fiches.css?v={{ ASSET_VERSION() }}" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<style>
+    /* Le tableau des articles est plus large que la modale sur un portable 13".
+       Il doit donc défiler horizontalement (comportement Bootstrap par défaut),
+       sinon les dernières colonnes — dont Actions — sont coupées et hors d'atteinte.
+       Les listes de suggestions ne sont pas rognées pour autant : elles sont
+       ancrées en `position: fixed` sous leur champ (cf. anchorSuggestionBox). */
+    #invoiceModal .modal-content {
+        overflow: visible;
+    }
+
+    /* Ensure cells don't clip absolutely positioned children */
+    #invoiceModal td {
+        overflow: visible;
+        position: relative;
+    }
+
+    /* Keep suggestions above other inputs/selects */
+    #invoiceModal .product-suggestions {
+        z-index: 3000;
+    }
+
+    #invoiceModal .position-relative {
+        z-index: 2000;
+    }
+
+    /* On small screens, keep it usable */
+    @media (max-width: 576px) {
+        #invoiceModal .position-relative {
+            min-width: auto;
+        }
+    }
+
+    /* Optional: hide native dropdown overflow if any stacking issues */
+    #invoiceModal select.form-select {
+        position: relative;
+        z-index: 1;
+    }
+
+    #invoiceModal input.product-search-input {
+        position: relative;
+        z-index: 2;
+    }
+
+    /* Prevent thead from covering the dropdown */
+    #invoiceModal thead {
+        position: relative;
+        z-index: 1;
+    }
+
+    #invoiceModal tbody {
+        position: relative;
+        z-index: 2;
+    }
+
+    /* Avoid table header sticky conflicts if any future change */
+    #invoiceModal .table thead th {
+        overflow: visible;
+    }
+    }
+</style>
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Factures</h1>
+        <p class="page-subtitle"><span data-mirror="#totalInvoices" data-mirror-suffix=" facture(s)">0 facture(s)</span></p>
+    </div>
+    <div class="page-header__actions">
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#invoiceModal"
+            onclick="openInvoiceModal()">
+            <i class="bi bi-plus-lg me-2"></i>Nouvelle facture
+        </button>
+    </div>
+</div>
+
+<!-- Statistiques -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="v3-stat v3-stat--brand h-100">
+            <span class="v3-stat__label">Total factures</span>
+            <span class="v3-stat__value" id="totalInvoices">0</span>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="v3-stat v3-stat--success h-100">
+            <span class="v3-stat__label">Payées</span>
+            <span class="v3-stat__value" id="paidInvoices">0</span>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="v3-stat v3-stat--warn h-100">
+            <span class="v3-stat__label">En attente</span>
+            <span class="v3-stat__value" id="pendingInvoices">0</span>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="v3-stat h-100">
+            <span class="v3-stat__label">Chiffre d'affaires</span>
+            <span class="v3-stat__value" id="totalRevenue">0 XOF</span>
+        </div>
+    </div>
+</div>
+
+<!-- Filtres -->
+<div class="v3-toolbar">
+    <div class="row g-3 align-items-end">
+        <div class="col-md-6 col-xl-3">
+            <label for="invoiceSearch" class="form-label">Rechercher</label>
+            <input type="text" class="form-control" id="invoiceSearch" placeholder="Numéro de facture ou {{ mot('identifiant_court') | lower }}…">
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <label for="statusFilter" class="form-label">Statut</label>
+            <select class="form-select" id="statusFilter">
+                <option value="">Tous les statuts</option>
+                <option value="DRAFT">Brouillon</option>
+                <option value="SENT">Envoyée</option>
+                <option value="PAID">Payée</option>
+                <option value="OVERDUE">En retard</option>
+                <option value="CANCELLED">Annulée</option>
+            </select>
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <label for="clientFilter" class="form-label">Client</label>
+            <input type="text" class="form-control" id="clientFilter" placeholder="Rechercher un client…">
+        </div>
+        <div class="col-md-3 col-xl-2">
+            <label for="dateFromFilter" class="form-label">Date de début</label>
+            <input type="date" class="form-control" id="dateFromFilter">
+        </div>
+        <div class="col-md-3 col-xl-2">
+            <label for="dateToFilter" class="form-label">Date de fin</label>
+            <input type="date" class="form-control" id="dateToFilter">
+        </div>
+    </div>
+</div>
+
+<!-- Liste des factures -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th data-col="number">Numéro</th>
+                        <th data-col="type">Type</th>
+                        <th data-col="client">Client</th>
+                        <th data-col="date">Date</th>
+                        <th data-col="due">Échéance</th>
+                        <th data-col="total">Montant</th>
+                        <th data-col="status">Statut</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="invoicesTableBody">
+                    <tr>
+                        <td colspan="8" class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Chargement...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer" id="pagination-container"></div>
+</div>
+
+<!-- Modal Facture -->
+<div class="modal fade" id="invoiceModal" tabindex="-1" data-bs-backdrop="true" data-bs-keyboard="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="invoiceModalTitle">
+                    <i class="bi bi-plus-circle me-2"></i>Nouvelle Facture
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="invoiceForm">
+                    <input type="hidden" id="invoiceId">
+
+                    <!-- Informations générales -->
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="invoiceType" class="form-label">Type de facture *</label>
+                                <select class="form-select" id="invoiceType" required onchange="toggleInvoiceType()">
+                                    <option value="normal">Facture normale</option>
+                                    <option value="exchange">Facture d'échange</option>
+                                    <option value="flash_sale">Vente Flash (sans client)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="invoiceNumber" class="form-label">Numéro de facture</label>
+                                <input type="text" class="form-control" id="invoiceNumber" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="invoiceDate" class="form-label">Date de facture *</label>
+                                <input type="date" class="form-control" id="invoiceDate" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientSearch" class="form-label">Client *</label>
+                                <div class="input-group">
+                                    <input type="text" id="clientSearch" class="form-control"
+                                        placeholder="Rechercher ou créer un client..." autocomplete="off" required>
+                                    <button class="btn btn-outline-primary" type="button" id="openQuickClientBtn">
+                                        <i class="bi bi-person-plus"></i> Nouveau
+                                    </button>
+                                </div>
+                                <input type="hidden" id="clientSelect" required>
+                                <div id="clientSearchResults" class="list-group position-absolute w-100"
+                                    style="z-index: 1050; max-height: 200px; overflow-y: auto; display: none;"></div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dueDate" class="form-label">Date d'échéance</label>
+                                <input type="date" class="form-control" id="dueDate">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Produits échangés (sortants) - Visible uniquement pour les échanges -->
+                    <div id="exchangeItemsSection" class="mb-3" style="display: none;">
+                        <div class="card border-info">
+                            <div class="card-header bg-info bg-opacity-10 d-flex justify-content-between align-items-center py-2">
+                                <div>
+                                    <i class="bi bi-arrow-left-right text-info me-2"></i>
+                                    <strong class="text-info">Produits reçus du client</strong>
+                                    <small class="text-muted ms-2">- Articles que le client donne en échange</small>
+                                </div>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-info btn-sm"
+                                        onclick="addExchangeItem()" title="Ajouter un produit du catalogue">
+                                        <i class="bi bi-plus-circle me-1"></i>Produit
+                                    </button>
+                                    <button type="button" class="btn btn-outline-info btn-sm"
+                                        onclick="addCustomExchangeItem()" title="Ajouter un article personnalisé">
+                                        <i class="bi bi-file-earmark-plus me-1"></i>Article libre
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Produit</th>
+                                                <th>Somme ajoutée</th>
+                                                <th>{{ mot('variante') }}</th>
+                                                <th>Quantité</th>
+                                                <th>Notes</th>
+                                                <th class="text-center" style="width: 60px;">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="exchangeItemsBody">
+                                            <!-- Les produits échangés seront ajoutés ici -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="p-3 border-top bg-light">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-6">
+                                            <label for="exchangeTotalAmount" class="form-label fw-bold mb-0">
+                                                <i class="bi bi-cash-coin me-1 text-success"></i>Somme totale à payer par le client
+                                            </label>
+                                            <small class="text-muted d-block">Montant total que le client doit verser en espèces</small>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="input-group">
+                                                <input type="number" class="form-control form-control-lg fw-bold"
+                                                       id="exchangeTotalAmount" min="0" step="1" value="0"
+                                                       placeholder="Montant total...">
+                                                <span class="input-group-text">XOF</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Articles (entrants) -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0"><i class="bi bi-cart3 me-1"></i>Articles</h6>
+                            <select class="form-select form-select-sm" id="priceTypeSelect" style="width: auto;">
+                                <option value="retail">Prix de vente</option>
+                                <option value="wholesale">Prix en gros</option>
+                            </select>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-5">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-primary text-white" title="Scanner USB"><i class="bi bi-upc-scan"></i></span>
+                                    <input type="text" class="form-control" id="invoiceBarcodeInput"
+                                        placeholder="Scan auto (scanner USB)" />
+                                    <button class="btn btn-primary" type="button" id="invoiceBarcodeBtn"
+                                        onclick="addItemByBarcode()">
+                                        <i class="bi bi-search me-1"></i>Rechercher
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text bg-success text-white" title="Saisie manuelle"><i class="bi bi-keyboard"></i></span>
+                                    <input type="text" class="form-control" id="invoiceManualBarcodeInput"
+                                        placeholder="Saisie manuelle code-barres / {{ mot('identifiant_court') | lower }}" />
+                                    <button class="btn btn-success" type="button"
+                                        onclick="addItemByManualBarcode()">
+                                        <i class="bi bi-check-lg me-1"></i>Valider
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-2">
+                                <div class="btn-group btn-group-sm w-100" role="group">
+                                    <button type="button" class="btn btn-outline-primary" onclick="addInvoiceItem()" title="Ajouter un article">
+                                        <i class="bi bi-plus-circle"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="addCustomItem()" title="Ajouter un service / ligne libre">
+                                        <i class="bi bi-file-earmark-plus"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-dark" onclick="addSectionRow()" title="Ajouter une section">
+                                        <i class="bi bi-list-ul"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th style="width:32px;" title="Glisser pour réordonner"><i
+                                                class="bi bi-grip-vertical text-muted"></i></th>
+                                        <th>Produit</th>
+                                        <th>{{ mot('variante') }}</th>
+                                        <th>Quantité</th>
+                                        <th>Type de prix</th>
+                                        <th>Prix unitaire</th>
+                                        <th>Prix externe</th>
+                                        <th>Bénéfice</th>
+                                        <th>Total</th>
+                                        <th><i class="bi bi-gift" title="Cadeau"></i></th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invoiceItemsBody">
+                                    <!-- Les articles seront ajoutés ici -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Totaux -->
+                    <div class="row">
+                        <div class="col-md-8"></div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div id="subtotalRow" class="d-flex justify-content-between">
+                                        <span>Sous-total:</span>
+                                        <span id="subtotal">0 XOF</span>
+                                    </div>
+                                    <div id="taxRow" class="d-flex justify-content-between align-items-center mb-2">
+                                        <span id="taxLabel">TVA (18%):</span>
+                                        <span id="taxAmount">0 XOF</span>
+                                    </div>
+                                    <div id="taxOptionsRow" class="row g-2 align-items-center">
+                                        <div class="col-6">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="showTaxSwitch"
+                                                    checked>
+                                                <label class="form-check-label" for="showTaxSwitch">Afficher TVA</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="input-group input-group-sm">
+                                                <span class="input-group-text">Taux</span>
+                                                <input type="number" class="form-control" id="taxRateInput" min="0"
+                                                    max="100" step="0.01" value="18">
+                                                <span class="input-group-text">%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="sectionPricesRow" class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" id="showSectionPricesSwitch"
+                                            checked>
+                                        <label class="form-check-label" for="showSectionPricesSwitch">Afficher prix par
+                                            article</label>
+                                    </div>
+                                    <div id="sectionTotalsRow" class="form-check form-switch mt-2">
+                                        <input class="form-check-input" type="checkbox" id="showSectionTotalsSwitch"
+                                            checked>
+                                        <label class="form-check-label" for="showSectionTotalsSwitch">Afficher total par
+                                            section</label>
+                                    </div>
+                                    <div id="exchangeDeductionRow" class="d-flex justify-content-between text-info mb-1" style="display: none;">
+                                        <span><i class="bi bi-arrow-left-right me-1"></i>Reprise échange:</span>
+                                        <span id="exchangeDeductionAmount">0 XOF</span>
+                                    </div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between fw-bold">
+                                        <span id="totalLabel">Total:</span>
+                                        <span id="totalAmount">0 XOF</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Paiement immédiat -->
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <!-- Informations sur les paiements existants (affiché lors de l'édition) -->
+                            <div id="existingPaymentInfo" class="alert alert-info py-2 mb-3" style="display:none;">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        <strong>État des paiements:</strong>
+                                    </div>
+                                    <div id="paymentStatusSummary" class="text-end">
+                                        <!-- Sera rempli dynamiquement -->
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="paymentNowSwitch">
+                                <label class="form-check-label" for="paymentNowSwitch">Enregistrer un paiement
+                                    maintenant</label>
+                            </div>
+                            <div id="paymentNowFields" class="row g-2" style="display:none;">
+                                <div class="col-md-4">
+                                    <label class="form-label">Montant</label>
+                                    <input type="number" class="form-control" id="paymentNowAmount" min="0" step="1">
+                                    <small class="form-text text-muted" id="paymentAmountHelp">Montant maximum: <span
+                                            id="maxPaymentAmount">0 XOF</span></small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Mode</label>
+                                    <select id="paymentNowMethod" class="form-select">
+                                        <!-- Options remplies dynamiquement depuis les paramètres (invoices.js / populatePaymentMethodSelects) -->
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Référence</label>
+                                    <input type="text" class="form-control" id="paymentNowRef">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Garantie -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0"><i class="bi bi-shield-check me-2"></i>Garantie</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="hasWarrantySwitch">
+                                        <label class="form-check-label" for="hasWarrantySwitch">
+                                            <strong>Inclure une garantie avec cette facture</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6" id="warrantyOptions" style="display: none;">
+                                    <label class="form-label">Durée de la garantie</label>
+                                    <div class="btn-group w-100" role="group" aria-label="Durée garantie">
+                                        <input type="radio" class="btn-check" name="warrantyDuration"
+                                            id="warranty1month" value="1">
+                                        <label class="btn btn-outline-primary" for="warranty1month">1 mois</label>
+
+                                        <input type="radio" class="btn-check" name="warrantyDuration"
+                                            id="warranty3months" value="3">
+                                        <label class="btn btn-outline-primary" for="warranty3months">3 mois</label>
+
+                                        <input type="radio" class="btn-check" name="warrantyDuration"
+                                            id="warranty6months" value="6">
+                                        <label class="btn btn-outline-primary" for="warranty6months">6 mois</label>
+
+                                        <input type="radio" class="btn-check" name="warrantyDuration"
+                                            id="warranty12months" value="12" checked>
+                                        <label class="btn btn-outline-primary" for="warranty12months">12 mois</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="warrantyInfo" class="mt-3" style="display: none;">
+                                <div class="alert alert-info py-2">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    <strong>La garantie/décharge sera automatiquement ajoutée en dernière page lors de
+                                        l'impression de la facture.</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="externalNotes" class="form-label">Note Externe (affichée sur la facture)</label>
+                                <textarea class="form-control" id="externalNotes" rows="3"
+                                    placeholder="Notes qui apparaîtront sur la facture imprimée..."></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="internalNotes" class="form-label">Note Interne (privée)</label>
+                                <textarea class="form-control" id="internalNotes" rows="3"
+                                    placeholder="Notes internes pour l'équipe (non visibles par le client)..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Signature -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-pen me-2"></i>Signature</h6>
+                            <small class="text-muted">PNG importé ou signature manuscrite</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Importer une image PNG</label>
+                                    <input type="file" id="signatureFile" accept="image/png" class="form-control" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Ou signer ci-dessous</label>
+                                    <canvas id="signatureCanvas" height="150" class="border w-100"
+                                        style="background:#fff; cursor: crosshair;"></canvas>
+                                    <div class="mt-2">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            id="signatureClearBtn"><i class="bi bi-eraser"></i> Effacer</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="text-muted">La signature sera ajoutée à la facture et visible à
+                                l'impression.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="saveInvoice('SENT')">
+                    <i class="bi bi-check-circle me-2"></i>Valider
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Détails Facture -->
+<div class="modal fade" id="invoiceDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-eye me-2"></i>Détails de la Facture</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="invoiceDetailBody">
+                <div class="text-center py-4 text-muted">Chargement...</div>
+            </div>
+            <div class="modal-footer justify-content-between">
+                <div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                </div>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-warning"
+                        onclick="resetInvoicePaymentsFromDetail(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0))">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser paiements
+                    </button>
+                    <button type="button" class="btn btn-outline-primary"
+                        onclick="editInvoice(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0))">
+                        <i class="bi bi-pencil me-1"></i>Modifier
+                    </button>
+                    <button type="button" class="btn btn-outline-success"
+                        onclick="addPayment(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0))">
+                        <i class="bi bi-credit-card me-1"></i>Paiement
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                        onclick="generateDeliveryNote(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0))">
+                        <i class="bi bi-truck me-1"></i>BL
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                        onclick="printInvoice(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0))">
+                        <i class="bi bi-printer me-1"></i>Imprimer
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                        onclick="downloadInvoicePdf(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0), this)">
+                        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+                    </button>
+                    <button type="button" class="btn btn-outline-success"
+                        onclick="sendInvoiceWhatsApp(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0))">
+                        <i class="bi bi-whatsapp me-1"></i>WhatsApp
+                    </button>
+                    <button type="button" class="btn btn-outline-info"
+                        onclick="sendInvoiceEmail(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0))">
+                        <i class="bi bi-envelope me-1"></i>Email
+                    </button>
+                    <button type="button" class="btn btn-outline-danger"
+                        onclick="deleteInvoice(Number(document.getElementById('invoiceDetailModal').dataset.invoiceId || 0))">
+                        <i class="bi bi-trash me-1"></i>Supprimer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Client rapide -->
+<div class="modal fade" id="clientQuickModal" tabindex="-1" data-bs-backdrop="true" data-bs-keyboard="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Nouveau Client</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-2">
+                    <label class="form-label">Nom *</label>
+                    <input type="text" class="form-control" id="qcName" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Téléphone</label>
+                    <input type="text" class="form-control" id="qcPhone">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" id="qcEmail">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label">Adresse</label>
+                    <textarea class="form-control" id="qcAddress" rows="2" placeholder="Adresse complète du client"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" id="saveQuickClientBtn">
+                    <i class="bi bi-check-circle me-1"></i>Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Éditer Facture (simple: recharge le formulaire avec les données) -->
+<div class="modal fade" id="invoiceEditModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Modifier la Facture</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-2">Le formulaire ci-dessous est pré-rempli avec les données de la
+                    facture. Modifiez puis enregistrez.</div>
+                <!-- On réutilise le même formulaire dans le modal principal via openInvoiceModal + chargement des données -->
+                <button class="btn btn-primary" id="openEditFormBtn">Ouvrir le formulaire d'édition</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Paiement -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-credit-card me-2"></i>Enregistrer un Paiement
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="paymentForm">
+                    <input type="hidden" id="paymentInvoiceId">
+
+                    <div class="mb-3">
+                        <label for="paymentAmount" class="form-label">Montant *</label>
+                        <input type="number" class="form-control" id="paymentAmount" step="1" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentMethod" class="form-label">Mode de paiement *</label>
+                        <select class="form-select" id="paymentMethod" required>
+                            <!-- Options remplies dynamiquement depuis les paramètres (invoices.js / populatePaymentMethodSelects) -->
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentDate" class="form-label">Date de paiement *</label>
+                        <input type="date" class="form-control" id="paymentDate" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentReference" class="form-label">Référence</label>
+                        <input type="text" class="form-control" id="paymentReference"
+                            placeholder="Numéro de transaction, chèque...">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="paymentNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="paymentNotes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="savePayment()">
+                    <i class="bi bi-check-circle me-2"></i>Enregistrer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Retour produit : retire des articles vendus et les remet en stock -->
+<div class="modal fade" id="returnModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrow-return-left me-2"></i>Retour produit — <span id="returnInvoiceNumber"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="returnInvoiceId">
+                <p class="text-muted small mb-3">
+                    Cochez les articles que le client rapporte : ils reviendront automatiquement en stock.
+                    Si la facture est déjà payée, le remboursement correspondant sera enregistré.
+                </p>
+                <div id="returnUnitsContainer"></div>
+                <div id="returnEmpty" class="text-center text-muted py-4 d-none">
+                    <i class="bi bi-inbox fs-2 d-block mb-2"></i>Aucun article retournable sur cette facture.
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between align-items-center">
+                <div class="small text-muted" id="returnSummary">Aucun article sélectionné</div>
+                <div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="button" class="btn btn-warning" id="returnConfirmBtn" onclick="submitReturn()" disabled>
+                        <i class="bi bi-arrow-return-left me-2"></i>Valider le retour
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- SortableJS pour le drag-and-drop des lignes -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="{{ URL_PREFIX }}/static/js/invoices.js?v={{ ASSET_VERSION() }}"></script>
+<script src="{{ URL_PREFIX }}/static/js/fix-invoices-errors.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}

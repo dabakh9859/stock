@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facture {{ invoice.invoice_number }} avec Garantie</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        :root {
+            --primary: #000000;
+            --primary-dark: #333333;
+            --warranty: #D4AF37;
+            --warranty-dark: #B8960C;
+            --dark: #000000;
+            --gray-light: #f9fafb;
+            --gray: #e5e5e5;
+            --text: #000000;
+            --text-light: #666666;
+            --warning: #666666;
+            --danger: #d32f2f;
+            --accent: #D4AF37;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 10pt;
+            color: var(--text);
+            background: #e0e0e0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* Contrôles d'impression */
+        .print-controls {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            gap: 12px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 50px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn {
+            padding: 10px 28px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 13px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--black);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #333;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--dark);
+            border: 1px solid var(--gray);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-light);
+        }
+
+        /* Page A4 */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 80px auto 40px;
+            position: relative;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .page:first-of-type {
+            margin-top: 80px;
+        }
+
+        /* Bande en haut */
+        .top-bar {
+            background: transparent;
+            border-top: 6px solid var(--accent);
+            height: 6px;
+            width: 100%;
+        }
+
+        .page-content {
+            padding: 25px 35px 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: calc(297mm - 25px);
+        }
+
+        /* En-tête */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 30px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 50px;
+            height: 50px;
+            background: transparent;
+            border: none;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--dark);
+            font-weight: 800;
+            font-size: 24px;
+        }
+
+        .brand-icon.warranty {
+            background: transparent;
+            border: none;
+        }
+
+        .brand-logo {
+            max-height: 100px;
+            max-width: 250px;
+            object-fit: contain;
+        }
+
+        .brand-text h1 {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--dark);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .brand-text p {
+            font-size: 8px;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .doc-title {
+            font-size: 24pt;
+            font-weight: 700;
+            color: var(--dark);
+            letter-spacing: -0.03em;
+        }
+
+        .doc-title.warranty {
+            color: var(--dark);
+            font-size: 24pt;
+        }
+
+
+        /* Section Client et Total */
+        .client-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--gray);
+        }
+
+        .client-info h3 {
+            color: var(--accent);
+            font-size: 8pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .client-info h3.warranty {
+            color: var(--accent);
+        }
+
+        .client-info h2 {
+            font-size: 11pt;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 4px;
+        }
+
+        .client-info p {
+            font-size: 11px;
+            color: var(--text-light);
+            margin-bottom: 2px;
+        }
+
+        .total-section {
+            text-align: right;
+        }
+
+        .total-due-label {
+            font-size: 12px;
+            color: var(--text-light);
+            margin-bottom: 2px;
+        }
+
+        .total-due-amount {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--black);
+            margin-bottom: 10px;
+        }
+
+        .doc-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .doc-meta-row {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            font-size: 10px;
+        }
+
+        .doc-meta-row .label {
+            color: var(--text-light);
+        }
+
+        .doc-meta-row .value {
+            color: var(--dark);
+            font-weight: 500;
+            min-width: 100px;
+            text-align: left;
+        }
+
+        /* Tableau des produits */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .items-table thead th {
+            color: var(--dark);
+            font-size: 8pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 0;
+            text-align: left;
+            background: transparent;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .items-table thead th:first-child {
+            padding-left: 0;
+        }
+
+        .items-table thead th:last-child {
+            padding-right: 0;
+        }
+
+        .items-table thead th.col-price,
+        .items-table thead th.col-qty,
+        .items-table thead th.col-total {
+            text-align: center;
+        }
+
+        .items-table tbody tr {
+            border-bottom: 1px solid var(--gray);
+        }
+
+        .items-table tbody tr:nth-child(even) {
+            background: var(--gray-light);
+        }
+
+        .items-table tbody td {
+            padding: 14px 15px;
+            font-size: 11px;
+            vertical-align: top;
+        }
+
+        .items-table tbody td:first-child {
+            padding-left: 25px;
+        }
+
+        .item-name {
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 2px;
+        }
+
+        .item-desc {
+            font-size: 10px;
+            color: var(--text-light);
+        }
+
+        .col-price,
+        .col-qty,
+        .col-total {
+            text-align: center;
+        }
+
+        .col-total {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .section-row td {
+            background: var(--gray-light) !important;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 10px;
+            color: var(--black);
+        }
+
+        /* Section inférieure */
+        .bottom-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-bottom: 20px;
+        }
+
+        /* Payment Method */
+        .payment-method h4 {
+            color: var(--accent);
+            font-size: 8pt;
+            font-weight: 700;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .payment-details {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 5px 15px;
+            font-size: 11px;
+        }
+
+        .payment-details .label {
+            color: var(--text-light);
+        }
+
+        .payment-details .value {
+            color: var(--dark);
+            font-weight: 500;
+        }
+
+        /* Totaux */
+        .totals-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .totals-table {
+            width: 100%;
+            max-width: 280px;
+        }
+
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 11px;
+            border-bottom: 1px solid var(--gray);
+        }
+
+        .totals-row .label {
+            color: var(--text-light);
+        }
+
+        .totals-row .value {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .totals-row.grand {
+            background: transparent;
+            color: var(--dark);
+            padding: 12px 0;
+            margin-top: 8px;
+            border: none;
+            border-top: 2px solid var(--accent);
+        }
+
+        .totals-row.grand .label,
+        .totals-row.grand .value {
+            color: var(--dark);
+            font-weight: 700;
+            font-size: 12pt;
+        }
+
+        /* Terms */
+        .terms-section {
+            margin-bottom: 20px;
+        }
+
+        .terms-section h4 {
+            font-size: 8pt;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .terms-section p {
+            font-size: 10px;
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        /* Signature */
+        .signature-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 25px;
+        }
+
+        .signatures-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            margin-bottom: 35px;
+            margin-top: 40px;
+            padding-top: 30px;
+        }
+
+        .signature-box {
+            width: 200px;
+            text-align: center;
+        }
+
+        .signatures-grid .signature-box {
+            width: 100%;
+        }
+
+        .signature-line {
+            border-bottom: 2px solid var(--dark);
+            height: 80px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .signature-img {
+            max-height: 45px;
+            max-width: 150px;
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .signature-label {
+            font-size: 10px;
+            color: var(--text-light);
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: auto;
+            border-top: 1px solid var(--gray);
+            padding-top: 20px;
+        }
+
+        .footer-contact {
+            display: flex;
+            gap: 20px;
+            font-size: 8pt;
+            color: var(--text-light);
+        }
+
+        .footer-contact strong {
+            color: var(--dark);
+        }
+
+        /* ========== WARRANTY PAGE STYLES ========== */
+        .warranty-duration-box {
+            background: #f0f0f0;
+            border: 2px solid #666666;
+            border-radius: 12px;
+            padding: 20px 30px;
+            text-align: center;
+        }
+
+        .warranty-duration-label {
+            font-size: 11px;
+            color: #333333;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .warranty-duration-value {
+            font-size: 36px;
+            font-weight: 800;
+            color: #1a1a1a;
+        }
+
+        .warranty-duration-value span {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .section {
+            margin-bottom: 18px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .section-icon {
+            width: 28px;
+            height: 28px;
+            background: var(--warranty);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+
+        .section-icon.danger {
+            background: var(--danger);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--dark);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section-content {
+            background: var(--gray-light);
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 12px;
+            color: var(--text-light);
+            line-height: 1.8;
+        }
+
+        .section-content strong {
+            color: var(--dark);
+        }
+
+        .section-content.exclusions {
+            background: #f0f0f0;
+            border-left: 4px solid var(--danger);
+            color: #333333;
+        }
+
+        .section-content ul {
+            padding-left: 18px;
+            margin: 8px 0;
+        }
+
+        .section-content li {
+            margin-bottom: 4px;
+        }
+
+        @media print {
+
+            html,
+            body {
+                background: white;
+            }
+
+            .print-controls {
+                display: none !important;
+            }
+
+            .page {
+                margin: 0;
+                box-shadow: none;
+                width: 210mm;
+                height: 297mm;
+                page-break-after: always;
+            }
+
+            .items-table thead {
+                display: table-header-group;
+            }
+
+            .items-table tbody tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="print-controls">
+        <a href="{{ URL_PREFIX }}/invoices" class="btn btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Retour
+        </a>
+        <button onclick="window.print()" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
+                <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            Imprimer
+        </button>
+    </div>
+
+    <!-- PAGE 1: FACTURE -->
+    <div class="page">
+        <div class="top-bar"></div>
+        <div class="page-content">
+            <!-- En-tête -->
+            <header class="header">
+                <div class="brand">
+                    {% set _logo = settings.logo or settings.logo_path %}
+                    {% if _logo %}
+                    <img src="{{ _logo | app_path }}" alt="Logo" class="brand-logo">
+                    {% else %}
+                    <div class="brand-icon"
+                        style="background: transparent; border: none; color: #D4AF37; font-size: 32px; width: auto; height: auto;">
+                        <i class="bi bi-apple"></i>
+                    </div>
+                    <div class="brand-text">
+                        <h1 style="color: #000;">GAPS APPLE</h1>
+                        <p style="color: #666;">Solutions Technologiques</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div style="text-align: right;">
+                    <div class="doc-title">FACTURE</div>
+                </div>
+            </header>
+
+            <!-- Section Client et Total -->
+            <div class="client-section">
+                <div class="client-info">
+                    <h3>Facturé à:</h3>
+                    {% if invoice.client %}
+                    <h2>{{ invoice.client.name }}</h2>
+                    {% if invoice.client.phone %}<p>Tél: {{ invoice.client.phone | format_phone_sn }}</p>{% endif %}
+                    {% if invoice.client.email %}<p>Email: {{ invoice.client.email }}</p>{% endif %}
+                    {% else %}
+                    <h2>Client Comptant</h2>
+                    {% endif %}
+                </div>
+                <div class="total-section">
+                    <div class="total-due-label">Total à payer</div>
+                    <div class="total-due-amount">{{ (invoice.total or 0) | format_cfa }}</div>
+                    <div class="doc-meta">
+                        <div class="doc-meta-row">
+                            <span class="label">N° Facture:</span>
+                            <span class="value">{{ invoice.invoice_number }}</span>
+                        </div>
+                        <div class="doc-meta-row">
+                            <span class="label">Date:</span>
+                            <span class="value">{{ invoice.date | format_date }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Produits échangés (reprise) - Visible uniquement pour les factures d'échange -->
+            {% if exchange_items %}
+            <div style="background: #f9fafb; border-radius: 6px; padding: 12px 16px; margin-bottom: 30px; border: 1px solid #e5e5e5; border-left: 3px solid #D4AF37;">
+                <div style="font-size: 9pt; font-weight: 600; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; color: #000;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    Produits échangés (reprise)
+                </div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 9pt;">
+                    <thead>
+                        <tr>
+                            <th style="padding: 4px 0; border: none; text-align: left; font-weight: 600;">Produit</th>
+                            <th style="padding: 4px 0; border: none; text-align: center; width: 80px; font-weight: 600;">Qté</th>
+                            <th style="padding: 4px 0; border: none; text-align: left; width: 150px; font-weight: 600;">{{ mot('identifiant_court') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ex in exchange_items %}
+                        <tr>
+                            <td style="padding: 4px 0; border: none;">{{ ex.product_name }}</td>
+                            <td style="padding: 4px 0; border: none; text-align: center;">{{ ex.quantity or 1 }}</td>
+                            <td style="padding: 4px 0; border: none; font-family: monospace; font-size: 8pt; color: #666;">{{ ex.variant_imei or '-' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+
+            <!-- Tableau des produits -->
+            {% set show_prices = invoice.show_item_prices if invoice.show_item_prices is defined else true %}
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        {% if invoice.invoice_type == 'exchange' %}
+                        <th style="width: 85%">Description</th>
+                        <th class="col-qty" style="width: 15%">Qté</th>
+                        {% else %}
+                        <th style="width: 50%">Description</th>
+                        {% if show_prices %}
+                        <th class="col-price" style="width: 15%">Prix</th>
+                        <th class="col-qty" style="width: 15%">Qté</th>
+                        <th class="col-total" style="width: 20%">Total</th>
+                        {% endif %}
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in grouped_items %}
+                    {% if item.is_section %}
+                    <tr class="section-row">
+                        <td colspan="{{ 4 if show_prices else 1 }}">{{ item.name }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td>
+                            {% if item.name %}
+                            <div style="font-weight: 500;">{{ item.name }}</div>
+                            {% endif %}
+                        </td>
+                        {% if invoice.invoice_type == 'exchange' %}
+                        <td class="col-qty">{{ item.qty }}</td>
+                        {% elif show_prices %}
+                        <td class="col-price">{{ item.price | format_cfa }}</td>
+                        <td class="col-qty">{{ item.qty }}</td>
+                        <td class="col-total">{{ item.total | format_cfa }}</td>
+                        {% endif %}
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% set display_note = "" %}
+            {% if invoice.external_notes %}
+                {% set display_note = invoice.external_notes %}
+            {% elif invoice.notes %}
+                {# Nettoyage des métadonnées pour les anciennes factures #}
+                {% set display_note = invoice.notes | replace_regex('\n?\n?__(SERIALS|SIGNATURE|QUOTE_QTYS)__=.*$', '') %}
+            {% endif %}
+
+            {% if display_note and display_note.strip() %}
+            <div style="margin-bottom: 20px; padding: 12px; background-color: #f9fafb; border-radius: 8px; border-left: 4px solid var(--accent);">
+                <div style="font-weight: 700; font-size: 8pt; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; letter-spacing: 0.5px;">Note</div>
+                <div style="font-size: 10pt; color: var(--text); white-space: pre-wrap; line-height: 1.5;">{{ display_note }}</div>
+            </div>
+            {% endif %}
+
+            <!-- Section inférieure -->
+            <div class="bottom-section">
+                <div class="payment-method">
+                    <h4>Mode de Paiement</h4>
+                    <div class="payment-details">
+                        <span class="label">Méthode:</span>
+                        <span class="value">{{ resolved_payment_method or invoice.payment_method or 'Espèces' }}</span>
+                        <span class="label">État:</span>
+                        <span class="value">{{ invoice.status or 'En attente' }}</span>
+                    </div>
+                </div>
+                <div class="totals-section">
+                    <div class="totals-table">
+                        {% if invoice.invoice_type == 'exchange' %}
+                        <!-- Facture échange: le client voit uniquement le montant qu'il verse -->
+                        <div class="totals-row grand">
+                            <span class="label">Total à payer:</span>
+                            <span class="value">{{ (invoice.total or 0) | format_cfa }}</span>
+                        </div>
+                        {% else %}
+                        <!-- Facture normale -->
+                        <div class="totals-row">
+                            <span class="label">Sous-total:</span>
+                            <span class="value">{{ (invoice.subtotal or 0) | format_cfa }}</span>
+                        </div>
+                        {% if invoice.show_tax %}
+                        <div class="totals-row">
+                            <span class="label">TVA:</span>
+                            <span class="value">{{ (invoice.tax_amount or 0) | format_cfa }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="totals-row grand">
+                            <span class="label">Total:</span>
+                            <span class="value">{{ (invoice.total or 0) | format_cfa }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Terms -->
+            <div class="terms-section">
+                <h4>Termes & Conditions:</h4>
+                <p>{{ settings.invoice_terms or 'Paiement à réception de facture. Les marchandises restent la propriété
+                    du vendeur jusqu\'au paiement intégral.' }}</p>
+            </div>
+
+            <!-- Signature -->
+            <div class="signature-section">
+                <div class="signature-box">
+                    <div class="signature-line">
+                        {% if signature_data_url %}
+                        <img src="{{ signature_data_url }}" class="signature-img">
+                        {% endif %}
+                    </div>
+                    <div class="signature-label">Signature & Cachet</div>
+                    {% if signature_location %}
+                    <div style="font-size: 6.5pt; color: #999; margin-top: 2px;">GPS: {{ signature_location }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="footer-contact">
+                    {% if settings.phone %}
+                    <div>Tél: <strong>{{ settings.phone }}</strong></div>
+                    {% endif %}
+                    {% if settings.email %}
+                    <div>Email: {{ settings.email }}</div>
+                    {% endif %}
+                    {% if settings.address %}
+                    <div>{{ settings.address }}</div>
+                    {% endif %}
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    {% if warranty_certificate %}
+    <!-- PAGE 2: GARANTIE -->
+    <div class="page">
+        <div class="top-bar"></div>
+        <div class="page-content">
+            <!-- En-tête -->
+            <header class="header">
+                <div class="brand">
+                    {% set _logo = settings.logo or settings.logo_path %}
+                    {% if _logo %}
+                    <img src="{{ _logo | app_path }}" alt="Logo" class="brand-logo">
+                    {% else %}
+                    <div class="brand-icon warranty"
+                        style="background: transparent; border: none; color: #D4AF37; font-size: 32px; width: auto; height: auto;">
+                        <i class="bi bi-apple"></i>
+                    </div>
+                    <div class="brand-text">
+                        <h1 style="color: #000;">GAPS APPLE</h1>
+                        <p style="color: #666;">Solutions Technologiques</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="doc-title warranty">GARANTIE</div>
+            </header>
+
+            <!-- Section référence et durée -->
+            <div class="client-section">
+                <div class="client-info">
+                    <h3 class="warranty">Informations Achat:</h3>
+                    <h2>Facture #{{ invoice.invoice_number }}</h2>
+                    <p>Date: {{ invoice.date | format_date }}</p>
+                    <p>Client: {{ invoice.client.name if invoice.client else 'Client Comptant' }}</p>
+                </div>
+                <div class="warranty-duration-box">
+                    <div class="warranty-duration-label">Durée de Garantie</div>
+                    <div class="warranty-duration-value">
+                        {% if warranty_certificate.duration == 1 %}30 <span>jours</span>
+                        {% elif warranty_certificate.duration == 6 %}180 <span>jours</span>
+                        {% elif warranty_certificate.duration == 12 %}365 <span>jours</span>
+                        {% else %}{{ warranty_certificate.duration * 30 }} <span>jours</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Étendue -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">✓</div>
+                    <div class="section-title">Étendue de la Garantie</div>
+                </div>
+                <div class="section-content">
+                    <strong>Conformité :</strong> Votre appareil sera réparé sans frais s'il ne fonctionne pas
+                    correctement.<br>
+                    <strong>Vices cachés :</strong> Les défauts cachés seront pris en charge pendant toute la durée de
+                    la garantie.
+                </div>
+            </div>
+
+            <!-- Couverture -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">🔧</div>
+                    <div class="section-title">Ce qui est couvert</div>
+                </div>
+                <div class="section-content">
+                    <ul>
+                        <li>Réparation gratuite des composants défectueux</li>
+                        <li>Remplacement si réparation impossible</li>
+                        <li>Support technique matériel</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Exclusions -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon danger">⚠</div>
+                    <div class="section-title">Exclusions</div>
+                </div>
+                <div class="section-content exclusions">
+                    Non couvert : chutes, eau, modifications non autorisées, surtensions, usure normale.
+                </div>
+            </div>
+
+            <!-- Signatures -->
+            <div class="signatures-grid">
+                <div class="signature-box">
+                    <div class="signature-line">
+                        {% if signature_data_url %}
+                        <img src="{{ signature_data_url }}" class="signature-img">
+                        {% endif %}
+                    </div>
+                    <div class="signature-label">Cachet {{ settings.company_name or 'Stock' }}</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Signature Client - Lu et approuvé</div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="footer-contact">
+                    {% if settings.phone %}
+                    <div>Tél: <strong>{{ settings.phone }}</strong></div>
+                    {% endif %}
+                    {% if settings.email %}
+                    <div>Email: {{ settings.email }}</div>
+                    {% endif %}
+                    {% if settings.address %}
+                    <div>{{ settings.address }}</div>
+                    {% endif %}
+                </div>
+            </footer>
+        </div>
+    </div>
+    {% endif %}
+
+    <script>
+        window.onload = function () {
+            const isInPopup = !!window.opener && window.name === 'invoice_print_popup';
+            if (isInPopup) {
+                setTimeout(() => window.print(), 400);
+            }
+        };
+        window.onafterprint = function () {
+            if (!!window.opener && window.name === 'invoice_print_popup') {
+                try { window.close(); } catch (e) { }
+            }
+        };
+    </script>
+</body>
+
+</html>

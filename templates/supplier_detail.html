@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Détails Fournisseur - Stock{% endblock %}
+
+{% block extra_head %}
+<style>
+    .stat-card {
+        transition: transform 0.2s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .info-label {
+        font-weight: 600;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- En-tête avec bouton retour -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a href="{{ URL_PREFIX }}/suppliers" class="btn btn-outline-secondary btn-sm mb-2">
+                <i class="bi bi-arrow-left me-1"></i>Retour aux fournisseurs
+            </a>
+            <h1 class="h3 mb-0">
+                <i class="bi bi-truck me-2 text-primary"></i>
+                <span id="supplierName">Chargement...</span>
+            </h1>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-outline-primary" onclick="editSupplier()">
+                <i class="bi bi-pencil me-1"></i>Modifier
+            </button>
+            <button class="btn btn-outline-danger" onclick="deleteSupplier()">
+                <i class="bi bi-trash me-1"></i>Supprimer
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistiques -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card border-left-primary shadow h-100">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                        Total Factures
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalInvoices">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card border-left-success shadow h-100">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                        Montant Total
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalAmount">0 F CFA</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card border-left-info shadow h-100">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                        Montant Payé
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="paidAmount">0 F CFA</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card stat-card border-left-warning shadow h-100">
+                <div class="card-body">
+                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                        Montant Restant
+                    </div>
+                    <div class="h5 mb-0 font-weight-bold text-gray-800" id="remainingAmount">0 F CFA</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations du fournisseur -->
+    <div class="row mb-4">
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header py-3">
+                    <h6 class="m-0">
+                        <i class="bi bi-info-circle me-2"></i>Informations
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-4 info-label">Nom:</div>
+                        <div class="col-sm-8" id="infoName">-</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4 info-label">Contact:</div>
+                        <div class="col-sm-8" id="infoContact">-</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4 info-label">Email:</div>
+                        <div class="col-sm-8" id="infoEmail">-</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4 info-label">Téléphone:</div>
+                        <div class="col-sm-8" id="infoPhone">-</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-4 info-label">Adresse:</div>
+                        <div class="col-sm-8" id="infoAddress">-</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-4 info-label">Créé le:</div>
+                        <div class="col-sm-8" id="infoCreatedAt">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6 mb-4">
+            <div class="card">
+                <div class="card-header py-3">
+                    <h6 class="m-0">
+                        <i class="bi bi-graph-up me-2"></i>Statistiques
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-sm-6 info-label">Factures payées:</div>
+                        <div class="col-sm-6" id="statPaidInvoices">0</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-6 info-label">Factures en attente:</div>
+                        <div class="col-sm-6" id="statPendingInvoices">0</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-6 info-label">Factures en retard:</div>
+                        <div class="col-sm-6 text-danger" id="statOverdueInvoices">0</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-sm-6 info-label">Dernière facture:</div>
+                        <div class="col-sm-6" id="statLastInvoice">-</div>
+                    </div>
+                    <div class="row">
+                        <div class="col-sm-6 info-label">Taux de paiement:</div>
+                        <div class="col-sm-6">
+                            <div class="progress">
+                                <div class="progress-bar bg-success" role="progressbar" id="paymentRateBar"
+                                    style="width: 0%">
+                                    <span id="paymentRateText">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historique des factures -->
+    <div class="card mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0">
+                <i class="bi bi-receipt me-2"></i>Historique des Factures
+            </h6>
+            <button class="btn btn-sm btn-primary" onclick="createInvoice()">
+                <i class="bi bi-plus-circle me-1"></i>Nouvelle Facture
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>N° Facture</th>
+                            <th>Date</th>
+                            <th>Échéance</th>
+                            <th>Montant</th>
+                            <th>Payé</th>
+                            <th>Restant</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invoicesTableBody">
+                        <tr>
+                            <td colspan="8" class="text-center py-4">
+                                <div class="spinner-border" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de modification -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Modifier le fournisseur</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="editName" class="form-label">Nom <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editContact" class="form-label">Personne à contacter</label>
+                        <input type="text" class="form-control" id="editContact">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="editEmail">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editPhone" class="form-label">Téléphone</label>
+                        <input type="text" class="form-control" id="editPhone">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editAddress" class="form-label">Adresse</label>
+                        <textarea class="form-control" id="editAddress" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmation de suppression -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirmer la suppression</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Êtes-vous sûr de vouloir supprimer ce fournisseur ?</p>
+                <p class="text-danger"><strong>Attention :</strong> Toutes les factures associées seront également
+                    supprimées.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">Supprimer</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/supplier_detail.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}

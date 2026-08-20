@@ -1,0 +1,605 @@
+/* ==========================================================================
+   Fiches détaillées de l'application — produit et client
+   --------------------------------------------------------------------------
+   Deux écrans, une même grammaire : un titre qui nomme la chose, des chiffres
+   lisibles, des paires intitulé/valeur, et des couleurs qui viennent toutes des
+   jetons du thème.
+
+   Fichier séparé de `style.css`, remplacé à chaque mise à jour du design.
+   ==========================================================================
+
+   1. Fiche produit — modale « Détails du Produit »
+   --------------------------------------------------------------------------
+   L'ancienne fiche empilait une image pleine largeur puis un tableau
+   « Nom: / Catégorie: / Prix: ». Le nom du produit et son prix — les deux
+   informations qu'on vient chercher — s'y lisaient comme n'importe quelle
+   autre ligne.
+
+   La fiche est réorganisée en deux colonnes : le visuel à gauche, l'identité
+   et les chiffres à droite, avec une hiérarchie explicite.
+
+   Fichier séparé de `style.css`, qui est remplacé à chaque mise à jour du
+   design. Toutes les couleurs viennent des jetons du thème : la version
+   précédente écrivait `#0a0a0a` et `background: #fff` en dur, illisibles en
+   thème sombre.
+   ========================================================================== */
+
+.pd-grille {
+  display: grid;
+  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 767.98px) {
+  .pd-grille { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* --- Colonne visuelle ----------------------------------------------------- */
+
+.pd-visuel {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  background: hsl(var(--muted) / 0.35);
+  padding: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+}
+
+.pd-visuel img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 0.5rem;
+}
+
+.pd-vignettes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.pd-vignette {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  padding: 2px;
+  cursor: pointer;
+  background: hsl(var(--muted) / 0.35);
+  /* La bordure est toujours présente, seule sa couleur change : sans cela la
+     vignette sélectionnée se décalerait de 2 px au clic. */
+  border: 2px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.pd-vignette:hover { border-color: hsl(var(--border)); }
+.pd-vignette.is-active { border-color: hsl(var(--foreground)); }
+
+
+/* --- Colonne d'identité --------------------------------------------------- */
+
+.pd-titre {
+  font-size: 1.35rem;
+  font-weight: 640;
+  line-height: 1.25;
+  margin: 0 0 0.25rem;
+  color: hsl(var(--foreground));
+}
+
+.pd-sous-titre {
+  font-size: 0.875rem;
+  color: hsl(var(--muted-foreground));
+  margin: 0 0 0.85rem;
+}
+
+.pd-prix {
+  font-size: 1.75rem;
+  font-weight: 660;
+  line-height: 1;
+  color: hsl(var(--foreground));
+}
+
+.pd-prix-achat {
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+  margin-top: 0.2rem;
+}
+
+.pd-etiquettes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.9rem 0 1.1rem;
+}
+
+/* Un état ne se lit jamais à la couleur seule : chaque pastille porte une
+   icône et un libellé. */
+.pd-etat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.pd-etat--ok {
+  color: #0a7d0a;
+  background: hsl(120 60% 45% / 0.12);
+  border-color: hsl(120 60% 45% / 0.35);
+}
+
+.pd-etat--faible {
+  color: #a86800;
+  background: hsl(38 92% 50% / 0.14);
+  border-color: hsl(38 92% 50% / 0.4);
+}
+
+.pd-etat--rupture {
+  color: #b02a2a;
+  background: hsl(0 72% 51% / 0.12);
+  border-color: hsl(0 72% 51% / 0.35);
+}
+
+:root[data-theme="dark"] .pd-etat--ok { color: #4ade80; }
+:root[data-theme="dark"] .pd-etat--faible { color: #fbbf24; }
+:root[data-theme="dark"] .pd-etat--rupture { color: #f87171; }
+
+.pd-etiquette-neutre {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
+}
+
+
+/* --- Caractéristiques : paires intitulé / valeur -------------------------- */
+
+.pd-specs {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.45rem 1rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.pd-specs dt {
+  color: hsl(var(--muted-foreground));
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.pd-specs dd {
+  margin: 0;
+  color: hsl(var(--foreground));
+  min-width: 0;
+  word-break: break-word;
+}
+
+
+/* --- Panneaux de texte libre ---------------------------------------------- */
+
+.pd-panneau {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.65rem;
+  padding: 0.8rem 0.95rem;
+  margin-top: 1rem;
+  background: hsl(var(--muted) / 0.25);
+}
+
+.pd-panneau h4 {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground));
+  margin: 0 0 0.4rem;
+}
+
+.pd-panneau p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: hsl(var(--foreground));
+  white-space: pre-wrap;   /* les notes saisies avec des retours à la ligne */
+}
+
+
+/* --- Bloc des variantes du stock ------------------------------------------ */
+
+.pd-section-titre {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid hsl(var(--border));
+  color: hsl(var(--foreground));
+}
+
+.pd-compteur {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+}
+
+
+/* ==========================================================================
+   2. Fiche client — page /clients/detail
+   --------------------------------------------------------------------------
+   Les quatre indicateurs étaient des aplats de couleur pleine hérités de
+   Bootstrap (`text-bg-primary`, `-success`, `-warning`, `-danger`). Saturés et
+   côte à côte, ils criaient tous en même temps et ne hiérarchisaient rien.
+   Ils deviennent des tuiles sobres ; seule celle qui appelle une action —
+   ce qui reste dû — porte une couleur, et jamais seule : un libellé la double.
+   ========================================================================== */
+
+.fc-entete {
+  margin-bottom: 1.25rem;
+}
+
+.fc-surtitre {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: hsl(var(--muted-foreground));
+  margin: 0 0 0.3rem;
+}
+
+/* Le nom du client est le titre de la page : c'est ce qu'on est venu voir.
+   L'ancienne version titrait « Fiche client » et reléguait le nom dans une
+   ligne « Nom: » au milieu d'un tableau. */
+.fc-nom {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 650;
+  line-height: 1.15;
+  margin: 0;
+  color: hsl(var(--foreground));
+}
+
+.fc-coordonnees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  margin-top: 0.6rem;
+  font-size: 0.875rem;
+}
+
+.fc-coordonnee {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.fc-coordonnee a {
+  color: hsl(var(--foreground));
+  text-decoration: none;
+}
+
+.fc-coordonnee a:hover { text-decoration: underline; }
+
+.fc-tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.fc-tuile {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: hsl(var(--card));
+}
+
+.fc-tuile__libelle {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 0.35rem;
+}
+
+.fc-tuile__valeur {
+  font-size: 1.375rem;
+  font-weight: 620;
+  line-height: 1.15;
+  color: hsl(var(--foreground));
+}
+
+.fc-tuile__pied {
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Seule la tuile qui appelle une action se colore, et le libellé porte le sens
+   autant que la couleur. */
+.fc-tuile--du {
+  border-color: hsl(38 92% 50% / 0.45);
+  background: hsl(38 92% 50% / 0.07);
+}
+
+.fc-tuile--du .fc-tuile__valeur { color: #a86800; }
+:root[data-theme="dark"] .fc-tuile--du .fc-tuile__valeur { color: #fbbf24; }
+
+.fc-tuile--solde {
+  border-color: hsl(120 60% 40% / 0.4);
+  background: hsl(120 60% 40% / 0.06);
+}
+
+.fc-tuile--solde .fc-tuile__valeur { color: #0a7d0a; }
+:root[data-theme="dark"] .fc-tuile--solde .fc-tuile__valeur { color: #4ade80; }
+
+
+/* ==========================================================================
+   3. Galerie ordonnable du formulaire produit
+   --------------------------------------------------------------------------
+   La première vignette est l'image principale : celle qui représente le
+   produit dans les listes et sur la boutique. Réordonner et désigner la
+   principale sont donc le même geste.
+
+   Le glisser-déposer natif ne fonctionne pas au doigt sur téléphone et reste
+   inaccessible au clavier : chaque vignette porte aussi deux flèches, qui font
+   exactement la même chose.
+   ========================================================================== */
+
+.gal-grille {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.gal-vignette {
+  position: relative;
+  width: 104px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.6rem;
+  background: hsl(var(--muted) / 0.3);
+  padding: 0.3rem;
+  cursor: grab;
+}
+
+.gal-vignette:active { cursor: grabbing; }
+
+.gal-vignette img {
+  width: 100%;
+  height: 78px;
+  object-fit: contain;
+  border-radius: 0.4rem;
+  pointer-events: none;   /* sinon l'image capte le glisser à la place de la tuile */
+}
+
+/* Pendant le déplacement, la tuile d'origine s'efface sans disparaître : la
+   grille garderait sinon un trou et les autres vignettes sauteraient. */
+.gal-vignette.est-deplacee { opacity: 0.35; }
+
+/* Repère de dépôt sur la tuile survolée. */
+.gal-vignette.est-cible {
+  border-color: hsl(var(--foreground));
+  box-shadow: 0 0 0 2px hsl(var(--foreground) / 0.15);
+}
+
+.gal-vignette__principale {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  font-size: 0.625rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+.gal-vignette__barre {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.2rem;
+  margin-top: 0.3rem;
+}
+
+.gal-bouton {
+  border: 0;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  border-radius: 0.3rem;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.gal-bouton:hover:not(:disabled) {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.gal-bouton:disabled { opacity: 0.3; cursor: default; }
+.gal-bouton--sup:hover { color: hsl(0 72% 51%); }
+
+
+/* ==========================================================================
+   4. En-tête des fiches Facture et Devis
+   --------------------------------------------------------------------------
+   Les deux modales ouvraient sur une pile de « Numéro: / Client: / Date: ».
+   Le numéro, le montant et l'état d'encaissement — ce qu'on vient vérifier —
+   s'y lisaient comme n'importe quelle autre ligne.
+
+   Seul l'en-tête est repris : les tableaux des lignes, des paiements et des
+   reprises restent tels quels. Ils fonctionnent, et les réécrire ferait courir
+   un risque à un écran critique pour un gain d'apparence.
+   ========================================================================== */
+
+.fd-entete {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.fd-numero {
+  font-size: 1.25rem;
+  font-weight: 640;
+  line-height: 1.2;
+  margin: 0;
+  color: hsl(var(--foreground));
+}
+
+.fd-client {
+  font-size: 0.9375rem;
+  margin: 0.2rem 0 0;
+  color: hsl(var(--foreground));
+}
+
+.fd-client a { color: inherit; text-decoration: none; }
+.fd-client a:hover { text-decoration: underline; }
+
+.fd-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin-top: 0.4rem;
+  font-size: 0.8125rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.fd-montants {
+  text-align: right;
+  min-width: 0;
+}
+
+.fd-total {
+  font-size: 1.6rem;
+  font-weight: 660;
+  line-height: 1;
+  color: hsl(var(--foreground));
+}
+
+.fd-reste {
+  font-size: 0.8125rem;
+  margin-top: 0.3rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* L'état porte une icône et un libellé : jamais la couleur seule. */
+.fd-statut {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.fd-statut--paye {
+  color: #0a7d0a;
+  background: hsl(120 60% 45% / 0.12);
+  border-color: hsl(120 60% 45% / 0.35);
+}
+
+.fd-statut--partiel {
+  color: #a86800;
+  background: hsl(38 92% 50% / 0.14);
+  border-color: hsl(38 92% 50% / 0.4);
+}
+
+.fd-statut--attente {
+  color: #b02a2a;
+  background: hsl(0 72% 51% / 0.12);
+  border-color: hsl(0 72% 51% / 0.35);
+}
+
+:root[data-theme="dark"] .fd-statut--paye { color: #4ade80; }
+:root[data-theme="dark"] .fd-statut--partiel { color: #fbbf24; }
+:root[data-theme="dark"] .fd-statut--attente { color: #f87171; }
+
+.fd-note {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.85rem;
+  margin-bottom: 0.9rem;
+  background: hsl(var(--muted) / 0.3);
+}
+
+.fd-note h4 {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground));
+  margin: 0 0 0.35rem;
+}
+
+.fd-note p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: hsl(var(--foreground));
+}
+
+/* La note interne n'est pas destinée au client : un liseré la distingue. */
+.fd-note--interne { border-left: 3px solid hsl(var(--foreground) / 0.4); }
+
+
+/* Numéros de série sous le nom de l'article, dans le détail d'une facture.
+   Ils sont nombreux quand plusieurs appareils du même modèle sont vendus : la
+   tabulaire aligne les chiffres en colonnes, ce qui rend la comparaison de
+   deux IMEI voisins nettement plus facile à l'œil. */
+.fd-imei {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: 1.45;
+}
+
+
+/* Compteurs de la fiche produit : ce qui reste, ce qui est parti.
+   Trois chiffres alignés, sans cadre — la valeur porte le poids, le libellé
+   reste discret. C'est l'information que la gérante cherche en premier en
+   ouvrant une fiche. */
+.pd-compteurs {
+  display: flex;
+  gap: 1.75rem;
+  margin-top: 1rem;
+  padding: 0.875rem 0;
+  border-top: 1px solid hsl(var(--border));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.pd-compteur {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.pd-compteur-valeur {
+  font-size: 1.375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-compteur-libelle {
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}

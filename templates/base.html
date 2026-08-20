@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Préfixe de montage de l'application, à poser sur toute URL absolue construite
+       en JavaScript. Vide en production, "/v2" sur la copie de recette.
+       Défini en tête de <head> : les scripts en ligne des pages filles s'exécutent
+       après, et peuvent donc s'en servir. -->
+  <script>
+    window.URL_PREFIX = "{{ URL_PREFIX }}";
+    /** Préfixe un chemin absolu de l'application ("/products" -> "/v2/products"). */
+    window.appPath = function (path) {
+      if (typeof path !== "string" || !path.startsWith("/")) return path;
+      return window.URL_PREFIX + path;
+    };
+  </script>
+
+  <!-- Mots et modules du métier de la boutique.
+       Les gabarits utilisent les globales `mot()` et `metier()` ; les scripts,
+       qui construisent une bonne part des tableaux, ont besoin des mêmes
+       valeurs. Posé ici pour la même raison que URL_PREFIX : tout ce qui suit
+       peut s'en servir.
+
+         MOT('identifiant_court')  -> « IMEI » ou « Référence »
+         METIER('identifiants')    -> faut-il montrer une colonne de série ?
+  -->
+  <script>
+    window.MOTS = {{ profil_boutique()['libelles'] | tojson }};
+    window.METIERS = {{ {
+      'atelier': metier('atelier'), 'garantie': metier('garantie'),
+      'peremption': metier('peremption'), 'declinaisons': metier('declinaisons'),
+      'identifiants': metier('identifiants'), 'etats': metier('etats'),
+      'unites': metier('unites')
+    } | tojson }};
+    /** Mot d'interface adapté au métier, avec repli sur la clé demandée. */
+    window.MOT = function (cle) {
+      return (window.MOTS && window.MOTS[cle]) || cle;
+    };
+    /** Vrai si le module a un sens ici *et* que l'abonnement le couvre. */
+    window.METIER = function (nom) {
+      return !!(window.METIERS && window.METIERS[nom]);
+    };
+  </script>
+
+  <!-- Thème posé avant le premier rendu. Appliqué plus tard, la page
+       apparaîtrait en sombre puis basculerait en clair — à chaque changement
+       de page. -->
+  <script>
+    (function () {
+      var root = document.documentElement;
+      try {
+        var t = localStorage.getItem('stockflow-theme');
+        root.setAttribute('data-theme', t === 'light' ? 'light' : 'dark');
+      } catch (e) {
+        root.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+
+  {% set _gs = global_settings or {} %}
+  {% set _comp = _gs.company if _gs.company is defined else {} %}
+  {% set _app_name = _gs.name or _gs.company_name or (_comp.companyName if _comp is defined else None) or (_comp.name if
+  _comp is defined else None) or 'Stock' %}
+  <title>{% block title %}{{ _app_name }}{% endblock %}</title>
+  {% set _favicon = _gs.favicon if (_gs is defined and _gs.favicon) else None %}
+  {% if _favicon %}
+  <link rel="icon" href="{{ _favicon | app_path }}?v={{ ASSET_VERSION() }}">
+  <link rel="shortcut icon" href="{{ _favicon | app_path }}?v={{ ASSET_VERSION() }}">
+  {% else %}
+  <link rel="icon" href="{{ URL_PREFIX }}/static/favicon.ico?v={{ ASSET_VERSION() }}">
+  <link rel="shortcut icon" href="{{ URL_PREFIX }}/static/favicon.ico?v={{ ASSET_VERSION() }}">
+  {% endif %}
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,450;14..32,500;14..32,600;14..32,700&display=swap"
+    rel="stylesheet">
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons (primary CDN) -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet"
+    crossorigin="anonymous">
+  <!-- Bootstrap Icons (fallback CDN) -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css"
+    rel="stylesheet" crossorigin="anonymous">
+  <script>
+    (function () {
+      function ensureBootstrapIcons() {
+        try {
+          var probe = document.createElement('i');
+          probe.className = 'bi';
+          document.body.appendChild(probe);
+          var famBefore = getComputedStyle(probe, '::before').fontFamily || '';
+          var fam = getComputedStyle(probe).fontFamily || '';
+          probe.remove();
+          if (!/bootstrap-icons/i.test(famBefore + fam)) {
+            var link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';
+            link.crossOrigin = 'anonymous';
+            document.head.appendChild(link);
+          }
+        } catch (e) { }
+      }
+      document.addEventListener('DOMContentLoaded', ensureBootstrapIcons);
+    })();
+  </script>
+  <!-- Custom CSS -->
+  <link href="{{ URL_PREFIX }}/static/css/style.css?v={{ ASSET_VERSION() }}" rel="stylesheet">
+  <!-- Draft Manager CSS -->
+  <link href="{{ URL_PREFIX }}/static/css/draft-manager.css?v={{ ASSET_VERSION() }}" rel="stylesheet">
+  <link href="{{ URL_PREFIX }}/static/css/mobile.css?v={{ ASSET_VERSION() }}" rel="stylesheet">
+
+  {% block extra_head %}{% endblock %}
+</head>
+
+<body id="app-body">
+  <a class="skip-link" href="#contenu">Aller au contenu</a>
+
+  {#
+    Navigation.
+
+    Elle est décrite une seule fois, en donnée, plutôt que dépliée en balisage :
+    la barre latérale la parcourt pour dessiner ses dépliants, et la barre
+    supérieure la reparcourt pour retrouver le libellé de la page affichée. Un
+    écran ajouté n'a donc qu'une ligne à écrire ici.
+
+    Les chemins comparés sont nus : nginx retire le préfixe avant de transmettre,
+    et `is_current()` (défini dans main.py) lit `scope["path"]`. Le préfixe n'est
+    reposé qu'à l'affichage du lien.
+  #}
+  {% set nav_groups = [
+    {'key': 'stock', 'label': 'Stock', 'icon': 'bi-box-seam', 'admin': false, 'items': [
+      {'path': '/products', 'icon': 'bi-boxes', 'label': 'Produits', 'exact': false},
+      {'path': '/stock-movements', 'icon': 'bi-arrow-left-right', 'label': 'Mouvements', 'exact': false},
+      {'path': '/scan', 'icon': 'bi-upc-scan', 'label': 'Scanner', 'exact': false},
+      {'path': '/peremption', 'icon': 'bi-calendar-x', 'label': 'Dates limites', 'exact': false, 'metier': 'peremption'},
+      {'path': '/stock-summary', 'icon': 'bi-clipboard-data', 'label': 'Récapitulatif', 'exact': false},
+      {'path': '/barcode-generator', 'icon': 'bi-upc', 'label': 'Codes-barres', 'exact': false, 'feature': 'barcode'}
+    ]},
+    {'key': 'ventes', 'label': 'Ventes', 'icon': 'bi-cart', 'admin': false, 'items': [
+      {'path': '/clients', 'icon': 'bi-people', 'label': 'Clients', 'exact': false},
+      {'path': '/quotations', 'icon': 'bi-file-earmark-text', 'label': 'Devis', 'exact': false},
+      {'path': '/invoices', 'icon': 'bi-receipt', 'label': 'Factures', 'exact': false},
+      {'path': '/debts', 'icon': 'bi-cash-stack', 'label': 'Créances', 'exact': false}
+    ]},
+    {'key': 'achats', 'label': 'Achats', 'icon': 'bi-bag', 'admin': false, 'items': [
+      {'path': '/arrivals', 'icon': 'bi-truck', 'label': 'Arrivages', 'exact': false},
+      {'path': '/suppliers', 'icon': 'bi-shop', 'label': 'Fournisseurs', 'exact': false},
+      {'path': '/supplier-invoices', 'icon': 'bi-receipt-cutoff', 'label': 'Factures fournisseur', 'exact': false},
+      {'path': '/daily-purchases', 'icon': 'bi-cart-check', 'label': 'Achats quotidiens', 'exact': false}
+    ]},
+    {'key': 'finances', 'label': 'Finances', 'icon': 'bi-cash-coin', 'admin': true, 'feature': 'reports', 'items': [
+      {'path': '/reports', 'icon': 'bi-graph-up', 'label': 'Rapports', 'exact': false},
+      {'path': '/daily-recap', 'icon': 'bi-journal-text', 'label': 'Récapitulatif', 'exact': false}
+    ]},
+    {'key': 'boutique', 'label': 'Boutique', 'icon': 'bi-globe', 'admin': false, 'feature': 'shop', 'items': [
+      {'path': '/boutique/catalogue', 'icon': 'bi-grid', 'label': 'Catalogue', 'exact': false},
+      {'path': '/boutique/bannieres', 'icon': 'bi-image', 'label': 'Bannières', 'exact': false},
+      {'path': '/boutique/variantes', 'icon': 'bi-palette', 'label': 'Variantes', 'exact': false},
+      {'path': '/boutique/prix', 'icon': 'bi-tag', 'label': 'Prix', 'exact': false},
+      {'path': '/boutique/commandes', 'icon': 'bi-bag-check', 'label': 'Commandes', 'exact': false},
+      {'path': '/boutique/livraisons', 'icon': 'bi-truck', 'label': 'Livraisons', 'exact': false},
+      {'path': '/boutique/demandes', 'icon': 'bi-bell', 'label': 'Demandes', 'exact': false},
+      {'path': '/boutique/zones', 'icon': 'bi-geo-alt', 'label': 'Zones de livraison', 'exact': false},
+      {'path': '/boutique/configuration', 'icon': 'bi-sliders', 'label': 'Configuration', 'exact': false}
+    ]},
+    {'key': 'outils', 'label': 'Outils', 'icon': 'bi-wrench-adjustable', 'admin': false, 'items': [
+      {'path': '/maintenances', 'icon': 'bi-tools', 'label': 'Maintenance', 'exact': false, 'feature': 'maintenance', 'metier': 'atelier'},
+      {'path': '/produits/doublons', 'icon': 'bi-union', 'label': 'Doublons produits', 'exact': false},
+      {'path': '/whatsapp', 'icon': 'bi-whatsapp', 'label': 'WhatsApp', 'exact': false, 'feature': 'whatsapp'},
+      {'path': '/guide', 'icon': 'bi-journal-bookmark', 'label': 'Guide', 'exact': false}
+    ]}
+  ] %}
+
+  {# Deux filtres indépendants pèsent sur une entrée, et ils ne disent pas la
+     même chose :
+
+       `feature` — ce que l'abonnement couvre. Non négociable.
+       `metier`  — ce qui a un sens dans ce commerce. Proposé par le profil de
+                   boutique, et l'administrateur peut le forcer depuis
+                   Paramètres → Métier de la boutique : une boutique de mode qui
+                   répare aussi des machines garde son atelier.
+
+     Masquer n'est pas protéger : le middleware de main.py refuse de toute façon
+     l'accès direct par URL à ce que le plan n'inclut pas. Un module éteint par
+     le métier, lui, reste accessible par son URL — c'est un rangement de menu,
+     pas un verrou. #}
+
+  {# Identité connue dès le rendu : la barre de navigation sort déjà dans son
+     état définitif (groupes d'administration, nom, rôle) et ne se réassemble
+     plus après la peinture. Vide si le cookie manque — le script prend alors
+     le relais comme avant. #}
+  {% set _nav_user = nav_user() %}
+
+  <div class="app-shell">
+
+    <!-- Barre de navigation supérieure -->
+    <header class="app-topbar" id="appTopbar">
+      {% set _logo_global = (global_settings.logo or global_settings.logo_path) if global_settings is defined else None %}
+      <a class="app-topbar__brand" href="{{ URL_PREFIX }}/" title="{{ _app_name }}">
+        <span class="app-topbar__mark">
+          {% if _logo_global %}
+          <img src="{{ _logo_global | app_path }}" alt="">
+          {% else %}
+          <i class="bi bi-box-seam" aria-hidden="true"></i>
+          {% endif %}
+        </span>
+        <span class="app-topbar__brand-name">{{ _app_name }}</span>
+      </a>
+
+      {# Sur écran étroit la barre horizontale ne tient pas : elle devient un
+         panneau dépliant, ouvert par ce bouton. #}
+      <button type="button" class="app-topbar__burger" id="navBurger" aria-controls="appMobnav"
+        aria-expanded="false" aria-label="Afficher la navigation">
+        <i class="bi bi-list" aria-hidden="true"></i>
+      </button>
+
+      <nav class="app-topnav" aria-label="Navigation principale">
+        <a class="app-topnav__link app-topnav__home" href="{{ URL_PREFIX }}/" title="Tableau de bord"
+          {% if is_current('/', true) %}aria-current="page" {% endif %}>
+          <i class="bi bi-grid-1x2" aria-hidden="true"></i><span class="app-topnav__label">Tableau de bord</span>
+        </a>
+
+        {% for group in nav_groups %}
+        {% if (not group.feature or plan_has(group.feature))
+              and (not group.metier or metier(group.metier)) %}
+        {% set _items = group['items'] | nav_visibles %}
+        {% if _items %}
+        {% set has_current = is_current_any(*_items | map(attribute='path') | list) %}
+        <div class="app-topnav__group{{ ' admin-only' if group['admin'] else '' }}"
+          {% if group['admin'] and not _nav_user.is_admin %}style="display: none;" {% endif %}>
+          {# Contrairement à la barre latérale, un menu déroulant part toujours
+             fermé : `data-contains-current` ne sert plus qu'à souligner le
+             groupe auquel appartient la page affichée. #}
+          <button type="button" class="app-topnav__toggle" data-nav-toggle
+            title="{{ group['label'] }}"
+            aria-expanded="false" aria-controls="grp-{{ group['key'] }}"
+            {% if has_current %}data-contains-current="true" {% endif %}>
+            <i class="bi {{ group['icon'] }}" aria-hidden="true"></i>
+            <span class="app-topnav__label">{{ group['label'] }}</span>
+            <i class="bi bi-chevron-down app-topnav__chevron" aria-hidden="true"></i>
+          </button>
+          <ul class="app-topnav__panel" id="grp-{{ group['key'] }}" hidden>
+            {% for item in _items %}
+            <li>
+              <a class="app-topnav__item" href="{{ URL_PREFIX }}{{ item['path'] }}"
+                {% if is_current(item['path'], item['exact']) %}aria-current="page" {% endif %}>
+                <i class="bi {{ item['icon'] }}" aria-hidden="true"></i><span>{{ item['label'] }}</span>
+              </a>
+            </li>
+            {% endfor %}
+            {% if group['key'] == 'boutique' %}
+            <li>
+              {# La vitrine est une autre application : son URL ne prend pas le préfixe. #}
+              <a class="app-topnav__item" href="/e-commerce" target="_blank" rel="noopener">
+                <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span>Voir le site</span>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+        {% endif %}{# _items #}
+        {% endif %}{# groupe visible #}
+        {% endfor %}
+
+      </nav>
+
+      <!-- Recherche unifiée (clients + produits) -->
+      <div class="navbar-search-wrapper" id="navSearchContainer">
+        <div class="navbar-search-group">
+          <span class="navbar-search-icon">
+            <i class="bi bi-search" aria-hidden="true"></i>
+          </span>
+          <input type="text" class="form-control bg-transparent border-0 shadow-none navbar-search-input"
+            placeholder="Rechercher…" id="navUnifiedSearch" autocomplete="off">
+          <span class="navbar-search-kbd" aria-hidden="true">/</span>
+        </div>
+        <!-- Résultats -->
+        <div class="dropdown-menu mt-2 py-0 overflow-hidden" id="navUnifiedDropdown"
+          style="width: 340px; right: 0; left: auto; max-height: 500px; display: none; z-index: 1050;">
+          <div class="d-flex border-bottom bg-light small fw-bold text-muted">
+            <div class="px-3 py-2 flex-grow-1">Résultats</div>
+            <div class="px-3 py-2 text-end" id="searchLoading" style="display:none;">
+              <span class="spinner-border spinner-border-sm" role="status"></span>
+            </div>
+          </div>
+          <div id="navUnifiedResults" class="list-group list-group-flush"
+            style="max-height: 400px; overflow-y: auto;"></div>
+        </div>
+      </div>
+
+      <a class="app-topbar__icon-btn" href="{{ URL_PREFIX }}/settings" aria-label="Paramètres" title="Paramètres"
+        {% if is_current('/settings') %}aria-current="page" {% endif %}>
+        <i class="bi bi-gear" aria-hidden="true"></i>
+      </a>
+
+      <button class="app-topbar__icon-btn" type="button" id="themeToggle" aria-label="Changer de thème"
+        title="Changer de thème">
+        <i class="bi bi-moon-stars theme-toggle__dark" aria-hidden="true"></i>
+        <i class="bi bi-sun theme-toggle__light" aria-hidden="true"></i>
+      </button>
+
+      <div class="dropdown">
+        <button type="button" class="app-topbar__account" data-bs-toggle="dropdown" aria-expanded="false"
+          aria-label="Mon compte">
+          <span class="app-topbar__avatar" aria-hidden="true"><i class="bi bi-person"></i></span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          {# `username` est le crochet attendu par `auth.js` (displayUserInfo).
+             Le rôle porte un identifiant préfixé : l'écran Paramètres a déjà un
+             `<select id="userRole">`, et un doublon ferait pointer
+             `getElementById` vers ce bloc au lieu du champ du formulaire. #}
+          <li class="app-topbar__account-head">
+            <span id="username">{{ _nav_user.full_name or _nav_user.username or 'Utilisateur' }}</span>
+            <span id="navUserRole">{{ _nav_user.role_label or 'Compte' }}</span>
+          </li>
+          <li>
+            <hr class="dropdown-divider">
+          </li>
+          <li><a class="dropdown-item" href="{{ URL_PREFIX }}/profile">
+              <i class="bi bi-person-circle" aria-hidden="true"></i>Mon profil
+            </a></li>
+          <li><a class="dropdown-item" href="{{ URL_PREFIX }}/settings">
+              <i class="bi bi-gear" aria-hidden="true"></i>Paramètres
+            </a></li>
+          {# L'ancre ouvre directement l'onglet Utilisateurs de la page
+             Paramètres, qui est loin dans la liste. #}
+          <li class="admin-only" {% if not _nav_user.is_admin %}style="display: none;" {% endif %}>
+            <a class="dropdown-item" href="{{ URL_PREFIX }}/settings#users">
+              <i class="bi bi-people" aria-hidden="true"></i>Utilisateurs
+            </a>
+          </li>
+          <li>
+            <hr class="dropdown-divider">
+          </li>
+          <li><a class="dropdown-item text-danger" href="#" onclick="logout(); return false;">
+              <i class="bi bi-box-arrow-right" aria-hidden="true"></i>Se déconnecter
+            </a></li>
+        </ul>
+      </div>
+
+      <!-- Animée dès qu'une requête est en vol (cf. compteur dans http.js). -->
+      <div class="app-progress" id="appProgress" role="status" aria-live="polite"
+        aria-label="Chargement en cours"></div>
+    </header>
+
+    {#
+      Navigation des écrans étroits.
+
+      La barre horizontale ne tient pas sous ~1200 px : ce panneau reprend les
+      mêmes groupes en accordéon, sous la barre. Il est rendu une seule fois,
+      replié, et n'existe visuellement qu'ouvert.
+    #}
+    <div class="app-mobnav" id="appMobnav" hidden>
+      <a class="app-mobnav__link" href="{{ URL_PREFIX }}/"
+        {% if is_current('/', true) %}aria-current="page" {% endif %}>
+        <i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Tableau de bord</span>
+      </a>
+
+      {% for group in nav_groups %}
+      {% if (not group.feature or plan_has(group.feature))
+            and (not group.metier or metier(group.metier)) %}
+      {% set _items = group['items'] | nav_visibles %}
+      {% if _items %}
+      {% set has_current = is_current_any(*_items | map(attribute='path') | list) %}
+      <div class="app-mobnav__group{{ ' admin-only' if group['admin'] else '' }}"
+        {% if group['admin'] and not _nav_user.is_admin %}style="display: none;" {% endif %}>
+        <button type="button" class="app-mobnav__toggle" data-nav-toggle
+          aria-expanded="{{ 'true' if has_current else 'false' }}" aria-controls="mgrp-{{ group['key'] }}">
+          <i class="bi {{ group['icon'] }}" aria-hidden="true"></i>
+          <span>{{ group['label'] }}</span>
+          <i class="bi bi-chevron-down app-mobnav__chevron" aria-hidden="true"></i>
+        </button>
+        <ul class="app-mobnav__panel" id="mgrp-{{ group['key'] }}" {% if not has_current %}hidden{% endif %}>
+          {% for item in _items %}
+          <li>
+            <a class="app-mobnav__item" href="{{ URL_PREFIX }}{{ item['path'] }}"
+              {% if is_current(item['path'], item['exact']) %}aria-current="page" {% endif %}>{{ item['label'] }}</a>
+          </li>
+          {% endfor %}
+          {% if group['key'] == 'boutique' %}
+          <li><a class="app-mobnav__item" href="/e-commerce" target="_blank" rel="noopener">Voir le site</a></li>
+          {% endif %}
+        </ul>
+      </div>
+      {% endif %}{# _items #}
+      {% endif %}{# groupe visible #}
+      {% endfor %}
+
+      <a class="app-mobnav__link" href="{{ URL_PREFIX }}/settings"
+        {% if is_current('/settings') %}aria-current="page" {% endif %}>
+        <i class="bi bi-gear" aria-hidden="true"></i><span>Paramètres</span>
+      </a>
+    </div>
+
+    <!-- Voile du panneau de navigation, sur écrans étroits -->
+    <div class="app-nav-scrim" id="navScrim" hidden></div>
+
+    {#
+      Boîte de confirmation de l'application.
+
+      Une seule instance, réutilisée par `confirmDialog()` (utils.js). Elle
+      remplace les `confirm()` du navigateur : ceux-ci ouvrent une fenêtre du
+      système d'exploitation, avec ses propres polices et couleurs, et bloquent
+      la page le temps de la réponse.
+    #}
+    <div class="modal fade" id="appConfirmModal" tabindex="-1" aria-hidden="true"
+      aria-labelledby="appConfirmTitle">
+      <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="appConfirmTitle">Confirmer</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+          </div>
+          <div class="modal-body">
+            {# `pre-line` : plusieurs messages existants portent des sauts de ligne. #}
+            <p class="mb-0" id="appConfirmMessage" style="white-space: pre-line;"></p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"
+              id="appConfirmCancel">Annuler</button>
+            <button type="button" class="btn btn-primary" id="appConfirmOk">Confirmer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-content">
+
+      <!-- Contenu principal -->
+      <main class="app-main" id="contenu">
+        <!-- Alertes (toast/alerts au-dessus des modals) -->
+        <div id="alerts-container" class="position-fixed top-0 end-0 p-3" style="z-index: 20000; width: 360px;"></div>
+
+        {% block content %}{% endblock %}
+      </main>
+    </div>
+  </div>
+
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- Client HTTP léger (remplace Axios) -->
+  <script src="{{ URL_PREFIX }}/static/js/http.js?v={{ ASSET_VERSION() }}"></script>
+  <!-- JsBarcode pour l'affichage/imp. des codes-barres -->
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <!-- Custom JS -->
+  <script src="{{ URL_PREFIX }}/static/js/auth.js?v={{ ASSET_VERSION() }}"></script>
+  <script src="{{ URL_PREFIX }}/static/js/utils.js?v={{ ASSET_VERSION() }}"></script>
+  <script src="{{ URL_PREFIX }}/static/js/storage.js?v={{ ASSET_VERSION() }}"></script>
+  <!-- Draft Manager JS -->
+  <script src="{{ URL_PREFIX }}/static/js/draft-manager.js?v={{ ASSET_VERSION() }}"></script>
+  <script src="{{ URL_PREFIX }}/static/js/row-click.js?v={{ ASSET_VERSION() }}"></script>
+  <script src="{{ URL_PREFIX }}/static/js/table-cards.js?v={{ ASSET_VERSION() }}"></script>
+
+  <script>
+    // Coquille : thème, dépliants de navigation, tiroir, raccourci de recherche.
+    document.addEventListener('DOMContentLoaded', function () {
+      // Détecter le mode embarqué pour cacher le chrome et le padding
+      try {
+        const qp = new URLSearchParams(window.location.search);
+        const isEmbed = qp.get('embed') === '1' || (window.top !== window.self);
+        if (isEmbed) {
+          document.body.classList.add('embedded');
+        }
+      } catch (e) { }
+
+      // --- Barre de progression ---------------------------------------------
+      // `http.js` compte les requêtes en vol et émet `http:start` / `http:idle`.
+      // Un court délai avant l'affichage évite de faire clignoter la barre sur
+      // les appels qui répondent en quelques dizaines de millisecondes.
+      const progress = document.getElementById('appProgress');
+      if (progress) {
+        let showTimer = null;
+        window.addEventListener('http:start', () => {
+          clearTimeout(showTimer);
+          showTimer = setTimeout(() => progress.setAttribute('data-active', 'true'), 180);
+        });
+        window.addEventListener('http:idle', () => {
+          clearTimeout(showTimer);
+          progress.setAttribute('data-active', 'false');
+        });
+      }
+
+      // --- Thème -------------------------------------------------------------
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) {
+        themeToggle.addEventListener('click', () => {
+          const next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', next);
+          try { localStorage.setItem('stockflow-theme', next); } catch (e) { }
+          applyChartTheme();
+        });
+      }
+
+      // --- Menus déroulants de la barre supérieure ---------------------------
+      // Un seul menu ouvert à la fois : la barre ne fait qu'une ligne de haut,
+      // deux panneaux ouverts se chevaucheraient.
+      const navToggles = Array.from(document.querySelectorAll('.app-topnav__toggle'));
+
+      const closeNavMenus = (except) => {
+        navToggles.forEach(toggle => {
+          if (toggle === except) return;
+          const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+          toggle.setAttribute('aria-expanded', 'false');
+          if (panel) panel.hidden = true;
+        });
+      };
+
+      navToggles.forEach(toggle => {
+        const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+        if (!panel) return;
+        toggle.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const open = toggle.getAttribute('aria-expanded') !== 'true';
+          closeNavMenus(toggle);
+          toggle.setAttribute('aria-expanded', String(open));
+          panel.hidden = !open;
+        });
+      });
+
+      // Un clic hors du menu le referme : sans cela il resterait ouvert en
+      // travers du contenu après avoir cliqué ailleurs.
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.app-topnav__group')) closeNavMenus(null);
+      });
+
+      // --- Panneau de navigation des écrans étroits -------------------------
+      const navBurger = document.getElementById('navBurger');
+      const navScrim = document.getElementById('navScrim');
+      const mobnav = document.getElementById('appMobnav');
+
+      const setMobnav = (open) => {
+        if (mobnav) mobnav.hidden = !open;
+        if (navScrim) navScrim.hidden = !open;
+        if (navBurger) navBurger.setAttribute('aria-expanded', String(open));
+        document.body.classList.toggle('nav-open', open);
+      };
+
+      if (navBurger) {
+        navBurger.addEventListener('click', () => setMobnav(mobnav ? mobnav.hidden : false));
+      }
+      if (navScrim) navScrim.addEventListener('click', () => setMobnav(false));
+
+      // Accordéon du panneau : ici les sections sont indépendantes, la place
+      // verticale ne manque pas. Celle de la page affichée arrive déjà ouverte.
+      document.querySelectorAll('.app-mobnav__toggle').forEach(toggle => {
+        const panel = document.getElementById(toggle.getAttribute('aria-controls'));
+        if (!panel) return;
+        toggle.addEventListener('click', () => {
+          const open = toggle.getAttribute('aria-expanded') !== 'true';
+          toggle.setAttribute('aria-expanded', String(open));
+          panel.hidden = !open;
+        });
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        closeNavMenus(null);
+        if (mobnav && !mobnav.hidden) setMobnav(false);
+      });
+
+      // Filet de sécurité pour les éléments réservés à l'administration.
+      //
+      // Le gabarit les rend désormais dans leur état définitif à partir du
+      // cookie d'authentification : dans le cas normal, cette fonction n'a plus
+      // rien à faire. Elle ne sert que si le cookie est absent ou illisible.
+      // Chaque écriture est donc conditionnée à un changement réel — sinon les
+      // rappels à 100 et 500 ms provoqueraient un remaniement de la barre après
+      // la peinture, précisément ce qu'on cherche à supprimer.
+      function showAdminElements() {
+        try {
+          if (window.authManager && window.authManager.isAdmin()) {
+            document.querySelectorAll('.admin-only').forEach(el => {
+              // removeProperty et non « block » : on rend l'élément à la
+              // hauteur que lui donne la feuille de style, sans l'imposer.
+              if (el.style.display === 'none') el.style.removeProperty('display');
+            });
+          }
+          const user = window.authManager ? window.authManager.getUser() : null;
+          if (!user) return;
+          const roleEl = document.getElementById('navUserRole');
+          if (roleEl && user.role) {
+            const roles = { admin: 'Admin', manager: 'Manager', user: 'Utilisateur' };
+            const label = roles[user.role] || user.role;
+            if (roleEl.textContent !== label) roleEl.textContent = label;
+          }
+        } catch (e) {
+          console.error('Erreur lors de la vérification du rôle:', e);
+        }
+      }
+
+      // Vérifier immédiatement
+      showAdminElements();
+
+      // Revérifier après un court délai pour s'assurer que authManager.verifyAuth() est terminé
+      setTimeout(showAdminElements, 100);
+      setTimeout(showAdminElements, 500);
+
+      // --- Sous-titres de page ------------------------------------------------
+      // Les en-têtes affichent un décompte (« 47 facture(s) ») que le script de
+      // la page calcule déjà pour sa tuile de statistiques. Plutôt que de
+      // modifier chacun de ces scripts, un élément portant
+      // `data-mirror="#totalInvoices"` recopie le texte de sa source à chaque
+      // fois qu'elle change.
+      document.querySelectorAll('[data-mirror]').forEach(target => {
+        const source = document.querySelector(target.getAttribute('data-mirror'));
+        if (!source) return;
+        const suffix = target.getAttribute('data-mirror-suffix') || '';
+        const sync = () => {
+          const value = (source.textContent || '').trim();
+          target.textContent = value ? value + suffix : '';
+        };
+        sync();
+        new MutationObserver(sync).observe(source, { childList: true, characterData: true, subtree: true });
+      });
+
+      const unifiedInput = document.getElementById('navUnifiedSearch');
+      const unifiedDropdown = document.getElementById('navUnifiedDropdown');
+      const unifiedResults = document.getElementById('navUnifiedResults');
+      const searchLoading = document.getElementById('searchLoading');
+
+      // « / » met le focus dans la recherche, sauf si l'on saisit déjà du texte
+      // ailleurs — le rappel est affiché dans le champ.
+      document.addEventListener('keydown', (e) => {
+        if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+        const t = e.target;
+        const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+        if (typing || !unifiedInput) return;
+        e.preventDefault();
+        unifiedInput.focus();
+      });
+
+      // Helper function to escape HTML
+      function escapeHtml(text) {
+        if (typeof text !== 'string') return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      const showMenu = (menu) => {
+        if (!menu) return;
+        menu.classList.add('show');
+        menu.style.display = 'block';
+      };
+      const hideMenu = (menu) => {
+        if (!menu) return;
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+      };
+      const highlight = (text, q) => {
+        if (!q) return text;
+        const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return text.replace(new RegExp(esc, 'ig'), m => `<mark class="px-0 bg-warning bg-opacity-25 text-dark">${m}</mark>`);
+      };
+
+      const debounce = (fn, wait = 250) => {
+        let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), wait); };
+      };
+
+      /*
+        Rendu des résultats.
+
+        Chaque entrée porte sa destination dans `data-href` plutôt qu'un
+        `onclick` : le clavier et la souris empruntent ainsi le même chemin, et
+        la sélection courante se déplace sans dupliquer la navigation.
+      */
+      function section(title, count) {
+        return `<div class="bg-light px-3 py-1 text-uppercase fw-bold text-muted" style="font-size:0.7rem;">${title} (${count})</div>`;
+      }
+
+      function resultItem(href, icon, title, subtitle, trailing) {
+        return `<button type="button" class="list-group-item list-group-item-action px-3 py-2 border-0 border-bottom search-result" data-href="${href}">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle bg-light text-muted d-flex align-items-center justify-content-center me-2" style="width: 28px; height: 28px; flex: none;">
+                            <i class="bi ${icon}"></i>
+                        </div>
+                        <div class="overflow-hidden w-100">
+                            <div class="d-flex justify-content-between align-items-center gap-2">
+                                <span class="fw-semibold text-truncate">${title}</span>
+                                ${trailing || ''}
+                            </div>
+                            ${subtitle ? `<small class="text-muted text-truncate d-block">${subtitle}</small>` : ''}
+                        </div>
+                    </div>
+                </button>`;
+      }
+
+      function renderUnifiedResults(groups, q) {
+        if (!unifiedResults) return;
+        let html = '';
+
+        if (groups.invoices.length) {
+          html += section('Factures', groups.invoices.length);
+          html += groups.invoices.slice(0, 5).map(inv => resultItem(
+            `/invoices?highlight=${inv.invoice_id}`,
+            'bi-receipt',
+            highlight(escapeHtml(inv.invoice_number || ''), q),
+            escapeHtml(inv.client_name || ''),
+            `<span class="badge bg-secondary badge-plain">${escapeHtml(formatAmount(inv.total))}</span>`
+          )).join('');
+        }
+
+        if (groups.quotations.length) {
+          html += section('Devis', groups.quotations.length);
+          html += groups.quotations.slice(0, 4).map(q2 => resultItem(
+            `/quotations?highlight=${q2.quotation_id}`,
+            'bi-file-earmark-text',
+            highlight(escapeHtml(q2.quotation_number || ''), q),
+            escapeHtml(q2.client_name || ''),
+            `<span class="badge bg-secondary badge-plain">${escapeHtml(formatAmount(q2.total))}</span>`
+          )).join('');
+        }
+
+        if (groups.clients.length) {
+          html += section('Clients', groups.clients.length);
+          html += groups.clients.slice(0, 4).map(c => resultItem(
+            `/clients/detail?id=${c.client_id}`,
+            'bi-person',
+            highlight(escapeHtml(c.name || ''), q),
+            escapeHtml([c.email, c.phone].filter(Boolean).join(' • '))
+          )).join('');
+        }
+
+        if (groups.products.length) {
+          html += section('Produits', groups.products.length);
+          html += groups.products.slice(0, 6).map(p => {
+            const hasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+            const available = hasVariants ? p.variants.filter(v => !v.is_sold).length : 0;
+            const inStock = hasVariants ? available > 0 : (p.quantity || 0) > 0;
+            return resultItem(
+              `/products?selected=${p.product_id}`,
+              'bi-box',
+              highlight(escapeHtml(p.name || ''), q),
+              escapeHtml([p.category, p.brand].filter(Boolean).join(' • ')),
+              `<span class="badge ${inStock ? 'bg-success' : 'bg-danger'}">${inStock ? 'Stock' : 'Rupture'}</span>`
+            );
+          }).join('');
+        }
+
+        if (!html) {
+          html = '<div class="p-4 text-center text-muted"><i class="bi bi-search d-block mb-2 opacity-50"></i>Aucun résultat trouvé</div>';
+        }
+
+        unifiedResults.innerHTML = html;
+        activeIndex = -1;
+        showMenu(unifiedDropdown);
+      }
+
+      function formatAmount(value) {
+        try {
+          return new Intl.NumberFormat('fr-FR', {
+            style: 'currency', currency: 'XOF', maximumFractionDigits: 0
+          }).format(Number(value) || 0);
+        } catch (e) { return String(value || ''); }
+      }
+
+      // --- Navigation au clavier dans les résultats -------------------------
+      let activeIndex = -1;
+
+      function results() {
+        return unifiedResults ? Array.from(unifiedResults.querySelectorAll('.search-result')) : [];
+      }
+
+      function setActive(index) {
+        const items = results();
+        if (!items.length) return;
+        // La liste boucle : arrivé en bas, la flèche repart en haut.
+        activeIndex = (index + items.length) % items.length;
+        items.forEach((el, i) => el.classList.toggle('active', i === activeIndex));
+        items[activeIndex].scrollIntoView({ block: 'nearest' });
+      }
+
+      function openResult(el) {
+        const href = el && el.dataset.href;
+        if (href) window.location.href = appPath(href);
+      }
+
+      const performSearch = debounce(async (q) => {
+        if (!q || q.trim().length < 2) {
+          hideMenu(unifiedDropdown);
+          return;
+        }
+
+        if (searchLoading) searchLoading.style.display = 'block';
+
+        try {
+          const http = window.axios || window.api;
+          if (!http) return;
+
+          // Une recherche ratée sur un domaine ne doit pas priver des autres :
+          // chaque appel retombe sur une liste vide.
+          const empty = { data: [] };
+          const [invoicesResp, quotationsResp, clientsResp, productsResp] = await Promise.all([
+            http.get('/api/invoices/', { params: { search: q, limit: 6 } }).catch(() => empty),
+            http.get('/api/quotations/', { params: { search: q, limit: 5 } }).catch(() => empty),
+            http.get('/api/clients/', { params: { search: q, limit: 5 } }).catch(() => empty),
+            http.get('/api/products', { params: { search: q, limit: 8 } }).catch(() => empty)
+          ]);
+
+          const asList = (r) => (r && r.data && r.data.items) || (r && r.data) || [];
+
+          renderUnifiedResults({
+            invoices: asList(invoicesResp),
+            quotations: asList(quotationsResp),
+            clients: asList(clientsResp),
+            products: asList(productsResp)
+          }, q);
+
+        } catch (e) {
+          console.error("Search error", e);
+          if (unifiedResults) unifiedResults.innerHTML = '<div class="text-danger p-3 text-center">Erreur de recherche</div>';
+        } finally {
+          if (searchLoading) searchLoading.style.display = 'none';
+        }
+      }, 300);
+
+      if (unifiedInput) {
+        unifiedInput.addEventListener('input', (e) => performSearch(e.target.value));
+        unifiedInput.addEventListener('focus', (e) => {
+          if (e.target.value.trim().length >= 2) performSearch(e.target.value);
+        });
+
+        unifiedInput.addEventListener('keydown', (e) => {
+          const open = unifiedDropdown && unifiedDropdown.classList.contains('show');
+          if (e.key === 'Escape') { hideMenu(unifiedDropdown); unifiedInput.blur(); return; }
+          if (!open) return;
+          if (e.key === 'ArrowDown') { e.preventDefault(); setActive(activeIndex + 1); }
+          else if (e.key === 'ArrowUp') { e.preventDefault(); setActive(activeIndex - 1); }
+          else if (e.key === 'Enter') {
+            const items = results();
+            // Sans sélection explicite, Entrée ouvre le premier résultat :
+            // c'est presque toujours celui que l'on cherche.
+            const target = items[activeIndex >= 0 ? activeIndex : 0];
+            if (target) { e.preventDefault(); openResult(target); }
+          }
+        });
+
+        if (unifiedResults) {
+          unifiedResults.addEventListener('click', (e) => {
+            const item = e.target.closest('.search-result');
+            if (item) openResult(item);
+          });
+          unifiedResults.addEventListener('mousemove', (e) => {
+            const item = e.target.closest('.search-result');
+            if (item) setActive(results().indexOf(item));
+          });
+        }
+
+        // Close on click outside
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('#navSearchContainer')) {
+            hideMenu(unifiedDropdown);
+          }
+        });
+      }
+
+      applyChartTheme();
+    });
+
+    /**
+     * Aligne Chart.js sur le thème courant.
+     *
+     * Les graphiques sont construits par les scripts de page (dashboard,
+     * rapports) avec les valeurs par défaut de Chart.js : axes et grilles en
+     * gris foncé, invisibles sur un fond sombre. On pose donc les défauts
+     * globaux ici, et on redessine les graphiques déjà rendus au changement de
+     * thème.
+     */
+    function applyChartTheme() {
+      if (!window.Chart) return;
+      const styles = getComputedStyle(document.documentElement);
+      const token = (name) => `hsl(${styles.getPropertyValue(name).trim()})`;
+      const tokenAlpha = (name, a) => `hsl(${styles.getPropertyValue(name).trim()} / ${a})`;
+
+      Chart.defaults.color = token('--muted-foreground');
+      Chart.defaults.borderColor = tokenAlpha('--border', 1);
+      Chart.defaults.font.family = 'Inter, ui-sans-serif, system-ui, sans-serif';
+      Chart.defaults.font.size = 11;
+
+      Object.values(Chart.instances || {}).forEach(chart => {
+        try { chart.update('none'); } catch (e) { }
+      });
+    }
+    window.applyChartTheme = applyChartTheme;
+  </script>
+  <script>
+    (function () {
+      try {
+        if (document.body && document.body.classList.contains('embedded')) return;
+        var lastV = '{{ ASSET_VERSION() }}';
+        function reloadWith(v) {
+          try {
+            if ('caches' in window) {
+              caches.keys().then(function (keys) { keys.forEach(function (k) { caches.delete(k); }); });
+            }
+          } catch (e) { }
+          try {
+            var u = new URL(window.location.href);
+            u.searchParams.set('__v', v);
+            window.location.replace(u.toString());
+          } catch (e) { window.location.reload(); }
+        }
+        function tick() {
+          fetch(appPath('/__live/version'), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+            var v = j && j.v ? String(j.v) : null;
+            if (v && v !== lastV) { reloadWith(v); }
+          }).catch(function () { });
+        }
+        setInterval(tick, 2000);
+      } catch (e) { }
+    })();
+  </script>
+
+  {# Assistant d'aide : relayé vers la plateforme, jamais de clé d'IA ici. #}
+  <script src="{{ URL_PREFIX }}/static/js/assistant.js?v={{ ASSET_VERSION() }}" defer
+          data-endpoint="{{ URL_PREFIX }}/api/assistant/chat"
+          data-title="Assistant Stock"
+          data-intro="Bonjour 👋 Une question sur l'application ? Demandez-moi comment faire une facture, enregistrer une réparation, imprimer des étiquettes…"></script>
+
+  {% block extra_scripts %}{% endblock %}
+</body>
+
+</html>

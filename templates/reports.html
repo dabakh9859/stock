@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block title %}Rapports - {{ _app_name }}{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  /* Sélecteur de tranche : mêmes segments que l'écran Récapitulatif. */
+  .range-presets {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.125rem;
+    padding: 0.1875rem;
+    background-color: hsl(var(--muted));
+    border-radius: var(--radius);
+  }
+
+  .range-preset {
+    border: none;
+    background: transparent;
+    color: hsl(var(--muted-foreground));
+    font-size: 0.8125rem;
+    font-weight: 500;
+    padding: 0.3125rem 0.6875rem;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .range-preset:hover { color: hsl(var(--foreground)); }
+
+  /* Sélecteur de tranche : segments plus épais et libres de passer à la ligne. */
+  @media (max-width: 767.98px) {
+    .range-presets { width: 100%; }
+    .range-preset { flex: 1 1 auto; padding: 0.5rem 0.625rem; text-align: center; }
+  }
+
+
+  .range-preset[aria-pressed="true"] {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    box-shadow: var(--shadow-sm);
+  }
+
+  .report-chart { height: 280px; }
+  .report-chart--donut { height: 240px; }
+
+  /* Évolution par rapport à la tranche précédente. */
+  .delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .delta--up { color: hsl(var(--success)); }
+  .delta--down { color: hsl(var(--danger)); }
+  .delta--flat { color: hsl(var(--muted-foreground)); }
+
+  .as-of-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    border: 1px solid hsl(var(--border));
+    border-radius: 999px;
+    padding: 0.125rem 0.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Rapports</h1>
+    <p class="page-subtitle" id="rangeSubtitle">Chargement…</p>
+  </div>
+  <div class="page-header__actions">
+    <button class="btn btn-outline-secondary" id="reportExport">
+      <i class="bi bi-download me-2"></i>Exporter (CSV)
+    </button>
+    <button class="btn btn-outline-secondary" id="rangeRefresh">
+      <i class="bi bi-arrow-clockwise me-2"></i>Actualiser
+    </button>
+  </div>
+</div>
+
+<!-- Sélecteur de tranche : pilote toute la page -->
+<div class="v3-toolbar">
+  <div class="d-flex flex-wrap align-items-end gap-3">
+    <div class="range-presets" role="group" aria-label="Tranches prédéfinies">
+      <button type="button" class="range-preset" data-preset="today">Aujourd'hui</button>
+      <button type="button" class="range-preset" data-preset="7d">7 jours</button>
+      <button type="button" class="range-preset" data-preset="30d">30 jours</button>
+      <button type="button" class="range-preset" data-preset="month">Ce mois</button>
+      <button type="button" class="range-preset" data-preset="lastmonth">Mois dernier</button>
+      <button type="button" class="range-preset" data-preset="quarter">90 jours</button>
+      <button type="button" class="range-preset" data-preset="year">Cette année</button>
+    </div>
+
+    <div class="d-flex align-items-end gap-2 ms-auto">
+      <div>
+        <label for="rangeStart" class="form-label">Du</label>
+        <input type="date" class="form-control" id="rangeStart">
+      </div>
+      <div>
+        <label for="rangeEnd" class="form-label">Au</label>
+        <input type="date" class="form-control" id="rangeEnd">
+      </div>
+      <button class="btn btn-primary" id="rangeApply">
+        <i class="bi bi-check2 me-2"></i>Appliquer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Indicateurs commerciaux -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Chiffre d'affaires facturé</span>
+      <span class="v3-stat__value" id="kpiInvoiced">0 F CFA</span>
+      <span class="v3-stat__hint" id="kpiInvoicedDelta"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Encaissé</span>
+      <span class="v3-stat__value" id="kpiPaid">0 F CFA</span>
+      <span class="v3-stat__hint" id="kpiPaidDelta"></span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Reste à encaisser</span>
+      <span class="v3-stat__value" id="kpiOutstanding">0 F CFA</span>
+      <span class="v3-stat__hint">Sur les factures de la période</span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Panier moyen</span>
+      <span class="v3-stat__value" id="kpiAvgTicket">0 F CFA</span>
+      <span class="v3-stat__hint" id="kpiInvoicesCount">0 facture(s)</span>
+    </div>
+  </div>
+</div>
+
+<!-- Évolution -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h6 class="mb-0">Facturé et encaissé, jour par jour</h6>
+    <span class="text-muted" style="font-size: 0.75rem;" id="comparisonLabel"></span>
+  </div>
+  <div class="card-body">
+    <div class="report-chart"><canvas id="trendChart"></canvas></div>
+  </div>
+</div>
+
+<!-- Répartitions -->
+<div class="row g-4 mb-4">
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Chiffre d'affaires par catégorie</h6>
+      </div>
+      <div class="card-body">
+        <div class="report-chart report-chart--donut mb-3"><canvas id="categoryChart"></canvas></div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Catégorie</th>
+                <th class="text-end">Quantité</th>
+                <th class="text-end">CA</th>
+                <th class="text-end">Part</th>
+              </tr>
+            </thead>
+            <tbody id="categoryTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Modes de règlement</h6>
+      </div>
+      <div class="card-body">
+        <div class="report-chart report-chart--donut mb-3"><canvas id="paymentChart"></canvas></div>
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Mode</th>
+                <th class="text-end">Opérations</th>
+                <th class="text-end">Montant</th>
+                <th class="text-end">Part</th>
+              </tr>
+            </thead>
+            <tbody id="paymentTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Palmarès -->
+<div class="row g-4 mb-4">
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Meilleurs produits</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th style="width:2.5rem;">#</th>
+                <th>Produit</th>
+                <th class="text-end">Quantité</th>
+                <th class="text-end">CA</th>
+              </tr>
+            </thead>
+            <tbody id="topProductsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-6">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Meilleurs clients</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th style="width:2.5rem;">#</th>
+                <th>Client</th>
+                <th class="text-end">Factures</th>
+                <th class="text-end">CA</th>
+              </tr>
+            </thead>
+            <tbody id="topClientsTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Devis, statuts, trésorerie -->
+<div class="row g-4 mb-4">
+  <div class="col-xl-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Devis</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Créés</span>
+              <span class="v3-stat__value" id="quotationsCreated">0</span>
+              <span class="v3-stat__hint" id="quotationsCreatedTotal">0 F CFA</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Acceptés</span>
+              <span class="v3-stat__value" id="quotationsAccepted">0</span>
+              <span class="v3-stat__hint" id="quotationsAcceptedTotal">0 F CFA</span>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Taux de conversion</span>
+              <span class="v3-stat__value" id="quotationsConversion">0 %</span>
+              <span class="v3-stat__hint">Devis acceptés / devis créés</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Statuts des factures</h6>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Statut</th>
+                <th class="text-end">Nombre</th>
+                <th class="text-end">Montant</th>
+              </tr>
+            </thead>
+            <tbody id="statusTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <h6 class="mb-0">Trésorerie</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Entrées banque</span>
+              <span class="v3-stat__value" id="treasuryIn">0 F CFA</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Sorties banque</span>
+              <span class="v3-stat__value" id="treasuryOut">0 F CFA</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Achats quotidiens</span>
+              <span class="v3-stat__value" id="treasuryPurchases">0 F CFA</span>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="v3-stat h-100">
+              <span class="v3-stat__label">Flux net</span>
+              <span class="v3-stat__value" id="treasuryNet">0 F CFA</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{#
+  Le stock est un état instantané, pas un cumul de la tranche : le repère
+  l'annonce, sinon on lirait « valeur du stock » comme une donnée de la période.
+#}
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h2 class="h6 mb-0">Stock</h2>
+  <span class="as-of-flag"><i class="bi bi-clock-history"></i>État à date, indépendant de la période</span>
+</div>
+
+<div class="row g-3">
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Valeur du stock</span>
+      <span class="v3-stat__value" id="stockValue">0 F CFA</span>
+      <span class="v3-stat__hint" id="stockProducts">0 produit(s)</span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Coût d'achat</span>
+      <span class="v3-stat__value" id="stockCost">0 F CFA</span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">Bénéfice potentiel</span>
+      <span class="v3-stat__value" id="stockProfit">0 F CFA</span>
+      <span class="v3-stat__hint" id="stockMargin">0 % de marge</span>
+    </div>
+  </div>
+  <div class="col-6 col-xl-3">
+    <div class="v3-stat h-100">
+      <span class="v3-stat__label">En rupture</span>
+      <span class="v3-stat__value" id="stockOutOfStock">0</span>
+      <span class="v3-stat__hint" id="stockWithStock">0 en stock</span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/reports.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}

@@ -1,0 +1,432 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration Boutique - {{ _app_name }}{% endblock %}
+
+{% block content %}
+<style>
+  /* L'aperçu occupe la hauteur restante et suit le défilement du formulaire. */
+  .preview-pane { position: sticky; top: 84px; }
+  .preview-frame {
+    width: 100%;
+    height: calc(100vh - 190px);
+    min-height: 520px;
+    border: 1px solid hsl(var(--border));
+    border-radius: .375rem;
+    background: #fff;
+  }
+  .preview-device { display: flex; gap: .25rem; }
+  .banner-thumb {
+    width: 100%; height: 90px;
+    object-fit: cover;
+    border: 1px solid hsl(var(--border));
+    border-radius: .25rem;
+    background: hsl(var(--muted));
+  }
+  .cfg-section { scroll-margin-top: 90px; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <h1 class="h3 mb-0"><i class="bi bi-sliders me-2"></i>Configuration de la boutique</h1>
+  <div class="d-flex gap-2">
+    <a href="{{ URL_PREFIX }}/e-commerce" target="_blank" class="btn btn-outline-secondary">
+      <i class="bi bi-box-arrow-up-right me-1"></i>Ouvrir le site
+    </a>
+    <button class="btn btn-primary" onclick="saveSettings()" id="saveBtn">
+      <i class="bi bi-check2 me-1"></i>Enregistrer
+    </button>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Formulaire -->
+  <div class="col-lg-7">
+    <form id="settingsForm">
+
+      <!-- Navigation interne -->
+      <div class="card mb-3">
+        <div class="card-body py-2 d-flex flex-wrap gap-1">
+          <a href="#cfgHero" class="btn btn-sm btn-outline-secondary">Carrousel</a>
+          <a href="#cfgSide" class="btn btn-sm btn-outline-secondary">Carte latérale</a>
+          <a href="#cfgWide" class="btn btn-sm btn-outline-secondary">Bannière</a>
+          <a href="#cfgSections" class="btn btn-sm btn-outline-secondary">Sections</a>
+          <a href="#cfgContact" class="btn btn-sm btn-outline-secondary">Coordonnées</a>
+          <a href="#cfgOrders" class="btn btn-sm btn-outline-secondary">Commandes</a>
+        </div>
+      </div>
+
+      <!-- Carrousel -->
+      <div class="card mb-4 cfg-section" id="cfgHero">
+        <div class="card-header bg-white">
+          <h6 class="mb-0"><i class="bi bi-images me-2"></i>Carrousel de la page d'accueil</h6>
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">Laissez le titre vide pour retirer une diapositive.</p>
+          <ul class="nav nav-tabs mb-3" role="tablist">
+            {% for i in [1, 2, 3] %}
+            <li class="nav-item">
+              <button class="nav-link {{ 'active' if i == 1 }}" data-bs-toggle="tab"
+                data-bs-target="#slide{{ i }}" type="button">Diapo {{ i }}</button>
+            </li>
+            {% endfor %}
+          </ul>
+          <div class="tab-content">
+            {% for i in [1, 2, 3] %}
+            <div class="tab-pane fade {{ 'show active' if i == 1 }}" id="slide{{ i }}">
+              <div class="mb-3">
+                <label class="form-label">Titre</label>
+                <input name="hero_{{ i }}_title" class="form-control">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Sous-titre</label>
+                <textarea name="hero_{{ i }}_subtitle" class="form-control" rows="2"></textarea>
+              </div>
+              <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">Libellé du bouton</label>
+                  <input name="hero_{{ i }}_cta" class="form-control">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Lien du bouton</label>
+                  <input name="hero_{{ i }}_link" class="form-control">
+                </div>
+              </div>
+              <label class="form-label">Image de fond</label>
+              <img class="banner-thumb mb-2" data-preview="hero_{{ i }}_image" alt="">
+              <div class="input-group">
+                <input name="hero_{{ i }}_image" class="form-control" placeholder="/static/...">
+                <button class="btn btn-outline-secondary" type="button"
+                  onclick="pickBanner('hero_{{ i }}_image')"><i class="bi bi-upload"></i></button>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Carte latérale -->
+      <div class="card mb-4 cfg-section" id="cfgSide">
+        <div class="card-header bg-white">
+          <h6 class="mb-0"><i class="bi bi-square-half me-2"></i>Carte latérale</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-2 mb-3">
+            <div class="col-md-7">
+              <label class="form-label">Titre</label>
+              <input name="side_title" class="form-control">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Lien</label>
+              <input name="side_link" class="form-control">
+            </div>
+          </div>
+          <label class="form-label">Image</label>
+          <img class="banner-thumb mb-2" data-preview="side_image" alt="">
+          <div class="input-group">
+            <input name="side_image" class="form-control">
+            <button class="btn btn-outline-secondary" type="button"
+              onclick="pickBanner('side_image')"><i class="bi bi-upload"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bannière large -->
+      <div class="card mb-4 cfg-section" id="cfgWide">
+        <div class="card-header bg-white">
+          <h6 class="mb-0"><i class="bi bi-badge-ad me-2"></i>Bannière large</h6>
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label">Titre</label>
+            <input name="wide_title" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sous-titre</label>
+            <input name="wide_subtitle" class="form-control">
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Libellé du prix</label>
+              <input name="wide_price_label" class="form-control">
+              <div class="form-text">Le montant est calculé sur le produit le moins cher.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Lien</label>
+              <input name="wide_link" class="form-control">
+            </div>
+          </div>
+          <label class="form-label">Image</label>
+          <img class="banner-thumb mb-2" data-preview="wide_image" alt="">
+          <div class="input-group">
+            <input name="wide_image" class="form-control">
+            <button class="btn btn-outline-secondary" type="button"
+              onclick="pickBanner('wide_image')"><i class="bi bi-upload"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sections -->
+      <div class="card mb-4 cfg-section" id="cfgSections">
+        <div class="card-header bg-white">
+          <h6 class="mb-0"><i class="bi bi-layout-text-window me-2"></i>Sections de la page</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Titre « produits en vedette »</label>
+              <input name="featured_title" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Titre « meilleures ventes »</label>
+              <input name="section_top_title" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Titre « récemment ajoutés »</label>
+              <input name="section_recent_title" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Titre « marques »</label>
+              <input name="section_brands_title" class="form-control">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Bandeau du haut</label>
+            <input name="banner_text" class="form-control">
+          </div>
+          <hr>
+          <p class="fw-semibold small mb-2">Afficher ces sections</p>
+          <div class="d-flex flex-wrap gap-4">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="show_brands" id="show_brands">
+              <label class="form-check-label" for="show_brands">Marques</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="show_offers" id="show_offers">
+              <label class="form-check-label" for="show_offers">Encarts disponibilité</label>
+            </div>
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="show_recent" id="show_recent">
+              <label class="form-check-label" for="show_recent">Récemment ajoutés</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coordonnées -->
+      <div class="card mb-4 cfg-section" id="cfgContact">
+        <div class="card-header bg-white">
+          <h6 class="mb-0"><i class="bi bi-telephone me-2"></i>Coordonnées affichées sur le site</h6>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Téléphone</label>
+              <input name="shop_phone" class="form-control" placeholder="+221 77 000 00 00">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">WhatsApp public</label>
+              <input name="shop_whatsapp" class="form-control" placeholder="221770000000">
+              <div class="form-text">Affiche le bouton flottant sur le site.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Email</label>
+              <input name="shop_email" type="email" class="form-control">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Adresse</label>
+              <input name="shop_address" class="form-control">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Commandes -->
+      <div class="card mb-4 cfg-section" id="cfgOrders">
+        <div class="card-header bg-white">
+          <h6 class="mb-0"><i class="bi bi-bell me-2"></i>Commandes, alertes et stock</h6>
+        </div>
+        <div class="card-body">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" name="notify_on_order" id="notify_on_order">
+            <label class="form-check-label" for="notify_on_order">
+              M'alerter sur WhatsApp à chaque nouvelle commande
+            </label>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Numéros à prévenir</label>
+            <input name="notify_numbers" class="form-control" placeholder="221770000000, 221780000000">
+            <div class="form-text">
+              Séparés par des virgules. Si vide, le WhatsApp public ci-dessus est utilisé.
+            </div>
+          </div>
+          <hr>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Déduction du stock</label>
+              <select name="stock_mode" class="form-select">
+                <option value="confirm">À la confirmation de la commande</option>
+                <option value="order">Dès le passage de la commande</option>
+                <option value="never">Jamais (gestion manuelle)</option>
+              </select>
+              <div class="form-text">
+                Les produits « sur commande » ne sont jamais déduits. Annuler une commande restitue le stock.
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Frais de livraison par défaut</label>
+              <input name="delivery_fee_default" type="number" class="form-control">
+              <div class="form-text">0 = « à convenir » affiché au client.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-5 d-flex gap-2 align-items-center">
+        <button type="button" class="btn btn-primary" onclick="saveSettings()">
+          <i class="bi bi-check2 me-1"></i>Enregistrer
+        </button>
+        <button type="button" class="btn btn-outline-secondary" onclick="loadSettings()">Annuler</button>
+        <span id="saveStatus" class="small text-muted"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- Aperçu -->
+  <div class="col-lg-5">
+    <div class="preview-pane">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="fw-semibold small"><i class="bi bi-eye me-1"></i>Aperçu du site</span>
+        <div class="preview-device">
+          <button class="btn btn-sm btn-outline-secondary active" data-width="100%"
+            onclick="setPreviewWidth(this,'100%')" title="Bureau"><i class="bi bi-display"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" data-width="820px"
+            onclick="setPreviewWidth(this,'820px')" title="Tablette"><i class="bi bi-tablet"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" data-width="390px"
+            onclick="setPreviewWidth(this,'390px')" title="Téléphone"><i class="bi bi-phone"></i></button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="refreshPreview()" title="Rafraîchir">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <iframe id="previewFrame" class="preview-frame" src="{{ URL_PREFIX }}/e-commerce" title="Aperçu"></iframe>
+      </div>
+      <div class="form-text mt-1">
+        L'aperçu se recharge après chaque enregistrement.
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="bannerFile" accept="image/*" class="d-none">
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const form = document.getElementById('settingsForm');
+  const SWITCHES = ['show_brands', 'show_offers', 'show_recent', 'notify_on_order'];
+  let bannerTarget = null;
+
+  /* ------------------------------------------------------------ chargement */
+  async function loadSettings() {
+    try {
+      const { data } = await axios.get('/api/shop/admin/settings');
+      Object.entries(data).forEach(([key, value]) => {
+        const field = form.elements[key];
+        if (!field) return;
+        if (field.type === 'checkbox') {
+          field.checked = String(value) === '1';
+        } else {
+          field.value = value ?? '';
+        }
+      });
+      refreshThumbs();
+    } catch (e) {
+      setStatus('Chargement impossible', 'danger');
+    }
+  }
+
+  function refreshThumbs() {
+    document.querySelectorAll('img[data-preview]').forEach((img) => {
+      const field = form.elements[img.dataset.preview];
+      const url = field ? field.value.trim() : '';
+      img.src = url || 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E';
+      img.style.opacity = url ? '1' : '.25';
+    });
+  }
+
+  form.addEventListener('input', (e) => {
+    if (e.target.name && e.target.name.endsWith('_image')) refreshThumbs();
+  });
+
+  /* ------------------------------------------------------------ upload */
+  function pickBanner(fieldName) {
+    bannerTarget = fieldName;
+    document.getElementById('bannerFile').click();
+  }
+
+  document.getElementById('bannerFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file || !bannerTarget) return;
+    setStatus('Envoi de l\'image…', 'muted');
+
+    const payload = new FormData();
+    payload.append('file', file);
+    try {
+      const { data } = await axios.post('/api/shop/admin/upload-banner', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      form.elements[bannerTarget].value = data.url;
+      refreshThumbs();
+      setStatus('Image envoyée — pensez à enregistrer', 'success');
+    } catch (err) {
+      setStatus(err.response?.data?.detail || 'Envoi impossible', 'danger');
+    } finally {
+      e.target.value = '';
+      bannerTarget = null;
+    }
+  });
+
+  /* ------------------------------------------------------------ sauvegarde */
+  async function saveSettings() {
+    setStatus('Enregistrement…', 'muted');
+    const payload = {};
+
+    new FormData(form).forEach((value, key) => { payload[key] = value; });
+    // Les interrupteurs non cochés n'apparaissent pas dans FormData.
+    SWITCHES.forEach((name) => {
+      const field = form.elements[name];
+      if (field) payload[name] = field.checked ? '1' : '0';
+    });
+
+    try {
+      await axios.put('/api/shop/admin/settings', payload);
+      setStatus('✓ Enregistré', 'success');
+      refreshPreview();
+      setTimeout(() => setStatus('', 'muted'), 2600);
+    } catch (err) {
+      setStatus(err.response?.data?.detail || 'Erreur lors de l\'enregistrement', 'danger');
+    }
+  }
+
+  function setStatus(message, tone) {
+    const el = document.getElementById('saveStatus');
+    el.textContent = message;
+    el.className = `small text-${tone === 'muted' ? 'muted' : tone}`;
+  }
+
+  /* ------------------------------------------------------------ aperçu */
+  function refreshPreview() {
+    const frame = document.getElementById('previewFrame');
+    // Le paramètre force le rechargement malgré le cache du navigateur.
+    frame.src = `/e-commerce?preview=${Date.now()}`;
+  }
+
+  function setPreviewWidth(btn, width) {
+    document.querySelectorAll('.preview-device .btn[data-width]').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('previewFrame').style.width = width;
+  }
+
+  loadSettings();
+</script>
+{% endblock %}

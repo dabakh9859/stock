@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Péremption — {{ _app_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dates limites</h1>
+        <p class="page-subtitle">Ce qui est périmé et ce qui approche</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <label for="fenetre" class="form-label mb-0 small text-muted">Surveiller</label>
+        <select class="form-select form-select-sm w-auto" id="fenetre">
+            <option value="0">déjà périmé</option>
+            <option value="7">7 jours</option>
+            <option value="15">15 jours</option>
+            <option value="30" selected>30 jours</option>
+            <option value="90">3 mois</option>
+        </select>
+    </div>
+</div>
+
+<div class="alert alert-secondary d-flex gap-2 align-items-start">
+    <i class="bi bi-info-circle mt-1"></i>
+    <div>
+        Les quantités indiquées sont celles <strong>reçues dans chaque lot</strong>,
+        pas ce qui reste en rayon : l'application ne sait pas quel lot le vendeur a
+        pris sur l'étagère. Servez-vous de cette liste pour aller vérifier, pas
+        comme d'un inventaire.
+    </div>
+</div>
+
+<div id="alerte"></div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="m-0 text-danger">
+            <i class="bi bi-exclamation-octagon me-2"></i>Périmés
+        </h6>
+        <span class="badge text-bg-danger" id="compteurPerimes">—</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th>{{ mot('identifiant_court') }}</th>
+                    <th>Date limite</th>
+                    <th>Depuis</th>
+                    <th class="text-end">Quantité reçue</th>
+                </tr>
+            </thead>
+            <tbody id="corpsPerimes">
+                <tr><td colspan="5" class="text-muted">Chargement…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="m-0 text-warning-emphasis">
+            <i class="bi bi-hourglass-split me-2"></i>À écouler
+        </h6>
+        <span class="badge text-bg-warning" id="compteurBientot">—</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Produit</th>
+                    <th>{{ mot('identifiant_court') }}</th>
+                    <th>Date limite</th>
+                    <th>Dans</th>
+                    <th class="text-end">Quantité reçue</th>
+                </tr>
+            </thead>
+            <tbody id="corpsBientot">
+                <tr><td colspan="5" class="text-muted">Chargement…</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ URL_PREFIX }}/static/js/peremption.js?v={{ ASSET_VERSION() }}"></script>
+{% endblock %}

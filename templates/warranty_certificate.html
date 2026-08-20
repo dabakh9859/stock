@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificat de Garantie - {{ invoice.invoice_number }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a1a1a;
+            --primary-dark: #0a0a0a;
+            --dark: #1a1a1a;
+            --gray-light: #f5f5f5;
+            --gray: #e0e0e0;
+            --text: #333333;
+            --text-light: #666666;
+            --warning: #666666;
+            --danger: #333333;
+        }
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 10pt;
+            color: var(--text);
+            background: #e0e0e0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        /* Contrôles d'impression */
+        .print-controls {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            gap: 12px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 50px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        }
+
+        .btn {
+            padding: 10px 28px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 13px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--dark);
+            border: 1px solid var(--gray);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-light);
+        }
+
+        /* Page A4 */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 80px auto 40px;
+            position: relative;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        /* Bande colorée en haut */
+        .top-bar {
+            background: var(--dark);
+            height: 25px;
+            width: 100%;
+        }
+
+        .page-content {
+            padding: 25px 35px 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: calc(297mm - 25px);
+        }
+
+        /* En-tête */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 25px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 800;
+            font-size: 24px;
+        }
+
+        .brand-logo {
+            max-height: 60px;
+            max-width: 180px;
+            object-fit: contain;
+        }
+
+        .brand-text h1 {
+            font-size: 22px;
+            font-weight: 800;
+            color: var(--dark);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .brand-text p {
+            font-size: 8px;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .doc-title {
+            font-size: 52px;
+            font-weight: 800;
+            color: var(--primary);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-align: right;
+        }
+
+        .doc-subtitle {
+            font-size: 12px;
+            color: var(--text-light);
+            text-align: right;
+            margin-top: 5px;
+        }
+
+        /* Section référence */
+        .ref-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--gray);
+        }
+
+        .ref-info h3 {
+            color: var(--primary);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .ref-info h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 5px;
+        }
+
+        .ref-info p {
+            font-size: 11px;
+            color: var(--text-light);
+            margin-bottom: 2px;
+        }
+
+        /* Durée de garantie */
+        .warranty-duration-box {
+            background: #f0f0f0;
+            border: 2px solid #666666;
+            border-radius: 12px;
+            padding: 20px 30px;
+            text-align: center;
+        }
+
+        .warranty-duration-label {
+            font-size: 11px;
+            color: #333333;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .warranty-duration-value {
+            font-size: 36px;
+            font-weight: 800;
+            color: #1a1a1a;
+        }
+
+        .warranty-duration-value span {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        /* Sections */
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .section-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--dark);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section-content {
+            background: var(--gray-light);
+            border-radius: 10px;
+            padding: 18px;
+            font-size: 12px;
+            color: var(--text-light);
+            line-height: 1.8;
+        }
+
+        .section-content strong {
+            color: var(--dark);
+        }
+
+        .section-content ul {
+            padding-left: 20px;
+            margin: 10px 0;
+        }
+
+        .section-content li {
+            margin-bottom: 6px;
+        }
+
+        /* Exclusions */
+        .exclusions-section .section-icon {
+            background: var(--danger);
+        }
+
+        .exclusions-section .section-content {
+            background: #f0f0f0;
+            border-left: 4px solid var(--danger);
+            color: #333333;
+        }
+
+        /* Procédure */
+        .procedure-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .procedure-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px dashed var(--gray);
+        }
+
+        .procedure-list li:last-child {
+            border-bottom: none;
+        }
+
+        .step-number {
+            min-width: 28px;
+            height: 28px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .step-content {
+            flex: 1;
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 3px;
+        }
+
+        .step-desc {
+            color: var(--text-light);
+        }
+
+        /* Signatures */
+        .signatures-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            margin-bottom: 35px;
+            margin-top: 40px;
+            padding-top: 30px;
+        }
+
+        .signature-box {
+            text-align: center;
+        }
+
+        .signature-line {
+            border-bottom: 2px solid var(--dark);
+            height: 80px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .signature-img {
+            max-height: 45px;
+            max-width: 150px;
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .signature-label {
+            font-size: 10px;
+            color: var(--text-light);
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--dark);
+            color: white;
+            padding: 20px 35px;
+            margin: 0 -35px -20px;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .footer-brand {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .footer-contact {
+            display: flex;
+            gap: 25px;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 10px;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .contact-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--primary);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+
+        @media print {
+            html, body {
+                background: white;
+            }
+
+            .print-controls {
+                display: none !important;
+            }
+
+            .page {
+                margin: 0;
+                box-shadow: none;
+                width: 210mm;
+                height: 297mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-controls">
+        <a href="{{ URL_PREFIX }}/invoices" class="btn btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            Retour
+        </a>
+        <button onclick="window.print()" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+            </svg>
+            Imprimer
+        </button>
+    </div>
+
+    <div class="page">
+        <!-- Bande en haut -->
+        <div class="top-bar"></div>
+
+        <div class="page-content">
+            <!-- En-tête -->
+            <header class="header">
+                <div class="brand">
+                    {% set _logo = settings.logo or settings.logo_path if settings else None %}
+                    {% if _logo %}
+                        <img src="{{ _logo | app_path }}" alt="Logo" class="brand-logo">
+                    {% else %}
+                        <div class="brand-icon">T</div>
+                        <div class="brand-text">
+                            <h1>{{ settings.company_name if settings else 'Stock' }}</h1>
+                            <p>Solutions Technologiques</p>
+                        </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="doc-title">GARANTIE</div>
+                    <div class="doc-subtitle">Certificat de Garantie Officiel</div>
+                </div>
+            </header>
+
+            <!-- Section référence et durée -->
+            <div class="ref-section">
+                <div class="ref-info">
+                    <h3>Informations Achat:</h3>
+                    <h2>Facture #{{ invoice.invoice_number }}</h2>
+                    <p>Date: {{ invoice.date | format_date }}</p>
+                    <p>Client: {{ invoice.client.name if invoice.client else 'Client Comptant' }}</p>
+                </div>
+                <div class="warranty-duration-box">
+                    <div class="warranty-duration-label">Durée de Garantie</div>
+                    <div class="warranty-duration-value">{{ warranty_duration }} <span>mois</span></div>
+                </div>
+            </div>
+
+            <!-- Étendue de la garantie -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">✓</div>
+                    <div class="section-title">Étendue de la Garantie</div>
+                </div>
+                <div class="section-content">
+                    <p><strong>Conformité :</strong> Votre appareil doit être conforme à la description fournie lors de l'achat. S'il ne fonctionne pas correctement ou ne correspond pas à nos spécifications, nous le réparerons sans frais supplémentaires.</p>
+                    <br>
+                    <p><strong>Vices cachés :</strong> Si votre appareil présente des défauts cachés affectant son bon fonctionnement, nous prendrons en charge les réparations nécessaires pendant toute la durée de la garantie.</p>
+                </div>
+            </div>
+
+            <!-- Procédure de réclamation -->
+            <div class="section">
+                <div class="section-header">
+                    <div class="section-icon">📋</div>
+                    <div class="section-title">Procédure de Réclamation</div>
+                </div>
+                <div class="section-content">
+                    <ul class="procedure-list">
+                        <li>
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Contactez notre Service Client</div>
+                                <div class="step-desc">Appelez-nous au numéro indiqué ci-dessous. Nous vous guiderons dans la procédure.</div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Préparez les Documents</div>
+                                <div class="step-desc">Munissez-vous de votre facture d'achat et de ce certificat de garantie.</div>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Réparation ou Remplacement</div>
+                                <div class="step-desc">Nous réparerons ou remplacerons votre appareil conformément à nos conditions.</div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Exclusions -->
+            <div class="section exclusions-section">
+                <div class="section-header">
+                    <div class="section-icon">⚠</div>
+                    <div class="section-title">Exclusions de Garantie</div>
+                </div>
+                <div class="section-content">
+                    <p>La garantie ne couvre <strong>pas</strong> les dommages causés par : utilisation inappropriée, négligence, chute, exposition à l'eau ou liquides, modifications non autorisées, surtensions électriques, ou tout dommage ne relevant pas d'un défaut de fabrication.</p>
+                </div>
+            </div>
+
+            <!-- Signatures -->
+            <div class="signatures-section">
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Cachet {{ settings.company_name if settings else 'Stock' }}</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Signature Client - Lu et approuvé</div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <div class="footer-content">
+                    <div class="footer-brand">{{ settings.company_name if settings else 'Stock' }}</div>
+                    <div class="footer-contact">
+                        <div class="contact-item">
+                            <div class="contact-icon">📞</div>
+                            <span>{{ settings.phone if settings else '+221 77 310 61 06' }}</span>
+                        </div>
+                        <div class="contact-item">
+                            <div class="contact-icon">✉️</div>
+                            <span>{{ settings.email if settings else 'contact@techzone.sn' }}</span>
+                        </div>
+                        <div class="contact-item">
+                            <div class="contact-icon">📍</div>
+                            <span>{{ settings.address if settings else 'Dakar, Sénégal' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+</body>
+</html>

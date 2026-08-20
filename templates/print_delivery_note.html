@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="fr" style="margin:0;padding:0;width:100%;height:100%;">
+<head>
+  <!-- Préfixe de montage de l'application (gabarit autonome : il n'hérite pas de
+       base.html, la définition est donc reprise ici). Vide en production, "/v2"
+       sur la copie de recette. -->
+  <script>
+    window.URL_PREFIX = "{{ URL_PREFIX }}";
+    window.appPath = function (path) {
+      if (typeof path !== "string" || !path.startsWith("/")) return path;
+      return window.URL_PREFIX + path;
+    };
+  </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bon de Livraison {{ (note.number if note else '') }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        :root {
+            --primary-color: #000000;
+            --secondary-color: #4b5563;
+            --border-color: #e5e7eb;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --bg-light: #f9fafb;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html, body {
+            margin: 0 !important; padding: 0 !important; width: 100% !important; min-height: 100vh !important; background-color: #f3f4f6;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif; line-height: 1.5; font-size: 10.5pt; color: var(--text-main); display: flex; flex-direction: column; align-items: center;
+        }
+
+        .page-controls { position: fixed; top: 20px; left: 0; right: 0; display: flex; justify-content: center; gap: 12px; z-index: 1000; }
+        .page-controls .btn { padding: 10px 20px; border-radius: 6px; font-weight: 600; font-size: 14px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 8px; border: none; cursor: pointer; transition: all 0.2s; }
+        .btn-print { background-color: #111827; color: #fff; }
+        .btn-print:hover { background-color: #000; }
+        .btn-return { background-color: #fff; color: #111827; border: 1px solid #d1d5db !important; }
+        .btn-return:hover { background-color: #f9fafb; }
+
+        .page-container { display: flex; justify-content: center; padding: 80px 0 40px; width: 100%; }
+
+        @media print {
+            html, body { background-color: #fff !important; width: 210mm; }
+            .page-container { padding: 0 !important; margin: 0 !important; }
+            #delivery-container { box-shadow: none !important; border: none !important; margin: 0 !important; width: 210mm !important; }
+            .no-print { display: none !important; }
+            @page { size: A4; margin: 12mm 12mm 15mm 12mm; }
+            
+            .footer { 
+                position: fixed; 
+                bottom: 0; 
+                left: 0; 
+                right: 0; 
+                padding: 10mm 12mm;
+                border-top: 1px solid var(--border-color);
+                background: transparent !important;
+            }
+        }
+
+        .container-a4 { 
+            width: 210mm; 
+            min-height: 297mm; 
+            background-color: #fff; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); 
+            display: flex; 
+            flex-direction: column; 
+            padding: 30px 40px; /* Marges optimisées */
+        }
+
+        /* Header */
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 40px; 
+            padding-bottom: 25px;
+            border-bottom: 2px solid #000;
+        }
+        .company-section { flex: 1; }
+        .logo { max-width: 220px; max-height: 100px; object-fit: contain; margin-bottom: 10px; }
+        .company-info h1 { font-size: 32px; font-weight: 900; letter-spacing: -0.04em; margin-bottom: 2px; text-transform: uppercase; color: #000; }
+        .company-info p { font-size: 11px; color: var(--text-muted); line-height: 1.4; margin: 0; }
+
+        .doc-info { 
+            text-align: right; 
+            background: #fdfdfd;
+            padding: 20px 30px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            min-width: 240px;
+        }
+        .doc-type { font-size: 26px; font-weight: 800; letter-spacing: 0.05em; color: #000; margin-bottom: 5px; text-transform: uppercase; }
+        .doc-number { font-size: 18px; font-weight: 600; color: var(--secondary-color); margin: 0; }
+        .doc-date { font-size: 12px; color: var(--text-muted); margin-top: 10px; font-weight: 500; }
+
+        /* Billing Section */
+        .details-grid { display: grid; grid-template-columns: 1.2fr 1fr; gap: 50px; margin-bottom: 40px; }
+        .detail-section-title { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .client-info p { margin-bottom: 4px; font-size: 14px; color: #333; }
+        .client-name { font-weight: 800; font-size: 18px !important; color: #000; margin-bottom: 8px !important; }
+
+        .meta-box { background: #fafafa; padding: 18px; border-radius: 10px; border: 1px solid #eee; }
+        .meta-item { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+        .meta-item:last-child { margin-bottom: 0; }
+        .meta-label { color: var(--text-muted); font-weight: 500; }
+        .meta-value { font-weight: 700; color: #000; }
+
+        /* Products Table */
+        .table-container { flex: 1; margin-bottom: 40px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 12px 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); border-bottom: 2px solid #000; }
+        td { padding: 16px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+        
+        .col-desc { width: 80%; }
+        .col-qty { width: 20%; text-align: center; font-weight: 700; font-size: 16px; }
+
+        .item-name { font-weight: 700; font-size: 14.5px; margin-bottom: 5px; color: #000; }
+        .item-meta { font-size: 11px; color: var(--text-muted); font-family: monospace; }
+        .section-row td { background-color: #fcfcfc; font-weight: 800; text-transform: uppercase; font-size: 12px; color: #000; border-bottom: 1px solid #eee; }
+
+        /* Notes box */
+        .delivery-notes { 
+            margin-bottom: 30px;
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        .delivery-notes h4 { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; color: #000; }
+        .delivery-notes ul { padding-left: 20px; }
+        .delivery-notes li { font-size: 12px; color: var(--secondary-color); margin-bottom: 6px; }
+
+        /* Signature Section */
+        .signatures-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 60px; }
+        .signature-box { text-align: center; }
+        .signature-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 20px; }
+        .signature-line { border-bottom: 1px solid #000; height: 80px; margin-bottom: 10px; position: relative; }
+        .signature-img { max-width: 240px; max-height: 100px; position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); }
+
+        /* Footer */
+        .footer { margin-top: auto; padding-top: 40px; border-top: 1px solid #000; }
+        .footer-grid { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 40px; }
+        .footer-col h4 { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; color: #000; }
+        .footer-col p { font-size: 11px; color: var(--text-muted); line-height: 1.6; margin: 0; }
+        .footer-bottom { margin-top: 30px; padding-top: 15px; border-top: 1px solid #eee; text-align: center; font-size: 10px; color: #999; letter-spacing: 0.02em; }
+
+        .text-end { text-align: right; }
+        .text-center { text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="page-controls no-print">
+        <button id="printBtn" class="btn btn-print"><i class="fas fa-print"></i> Imprimer</button>
+        <button id="returnBtn" class="btn btn-return"><i class="fas fa-arrow-left"></i> Retour</button>
+    </div>
+
+    <div class="page-container">
+        <div id="delivery-container" class="container-a4">
+            <div class="header">
+                <div class="company-section">
+                    {% set _logo = settings.logo or settings.logo_path %}
+                    {% if _logo %}
+                        <img src="{{ _logo | app_path }}" alt="Logo" class="logo" style="max-height: 100px; max-width: 300px; object-fit: contain; margin-bottom: 5px;">
+                    {% else %}
+                        <h1>{{ settings.company_name or 'Stock' }}</h1>
+                    {% endif %}
+                    <div class="company-info" style="margin-top: 10px;">
+                        <p>{{ settings.address or '' }}{% if settings.city %}, {{ settings.city }}{% endif %}</p>
+                        {% if settings.phone %}<p>Tél: {{ settings.phone }}</p>{% endif %}
+                        {% if settings.email %}<p>Email: {{ settings.email }}</p>{% endif %}
+                    </div>
+                </div>
+                <div class="doc-info">
+                    <h2 class="doc-type">Bon de Livraison</h2>
+                    <p class="doc-number">#{{ (note.number if note else '') }}</p>
+                    <p class="doc-date">Date: {{ (note.delivery_date | format_date if note and note.delivery_date else '') }}</p>
+                </div>
+            </div>
+
+            <div class="details-grid">
+                <div class="client-info">
+                    <div class="detail-section-title">Destinataire</div>
+                    <p class="client-name">{{ (note.client_name if note else 'Client') }}</p>
+                    {% if note and note.delivery_address %}<p>{{ note.delivery_address }}</p>{% endif %}
+                    {% if note and note.delivery_contact %}<p>Contact: {{ note.delivery_contact }}</p>{% endif %}
+                    {% if note and note.delivery_phone %}<p>Tél: {{ note.delivery_phone }}</p>{% endif %}
+                </div>
+                <div class="doc-meta">
+                    <div class="detail-section-title">Informations de Livraison</div>
+                    <div class="meta-box">
+                        <div class="meta-item">
+                            <span class="meta-label">Référence</span>
+                            <span class="meta-value">{{ (note.number if note else '-') }}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Date prévue</span>
+                            <span class="meta-value">{{ (note.delivery_date | format_date if note and note.delivery_date else '-') }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th class="col-desc">Désignation des Articles</th>
+                            <th class="col-qty">Quantité</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if note and note['items'] %}
+                            {% for item in note['items'] %}
+                            <tr>
+                                <td class="col-desc">
+                                    <div class="item-name">{{ item['product_name'] }}</div>
+                                    {% if item.get('serials') and item['serials']|length %}
+                                        <div class="item-meta">{{ mot('identifiant_court') }} : {{ item['serials']|join(', ') }}</div>
+                                    {% endif %}
+                                </td>
+                                <td class="col-qty">{{ item['quantity'] | format_number }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="2" class="text-center text-muted">Aucun article dans ce bon de livraison</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="delivery-notes">
+                <h4>Conditions & Notes</h4>
+                <ul>
+                    <li>Veuillez vérifier l'état des marchandises à la réception.</li>
+                    <li>Toute réclamation doit être faite dans les 24 heures suivant la livraison.</li>
+                    <li>Vérifiez la conformité des {{ mot('identifiant') | lower }} le cas échéant.</li>
+                </ul>
+            </div>
+
+            <div class="signature-grid">
+                <div class="signature-box">
+                    <div class="signature-label">Signature Livreur</div>
+                    <div class="signature-line"></div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-label">Réceptionné par (Nom & Signature)</div>
+                    <div class="signature-line">
+                        {% if signature_data_url %}
+                        <img src="{{ signature_data_url }}" alt="Signature" class="signature-img" />
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="footer">
+                <div class="footer-grid">
+                    <div class="footer-col">
+                        <h4>Localisation</h4>
+                        <p>{{ settings.address or 'Adresse par défaut' }}{% if settings.city %}<br>{{ settings.city }}{% endif %}</p>
+                    </div>
+                    <div class="footer-col text-center">
+                        <h4>Contact Direct</h4>
+                        <p>
+                            {% if settings.phone %}Tél: {{ settings.phone }}{% endif %}
+                            {% if settings.phone2 %}<br>Tél 2: {{ settings.phone2 }}{% endif %}
+                            {% if settings.email %}<br>Email: {{ settings.email }}{% endif %}
+                        </p>
+                    </div>
+                    <div class="footer-col text-end">
+                        <h4>En Ligne</h4>
+                        <p>
+                            {% if settings.instagram %}Instagram: @{{ settings.instagram }}{% endif %}
+                            {% if settings.website %}<br>Site: {{ settings.website }}{% endif %}
+                            {% if not settings.instagram and not settings.website %}techzone.com{% endif %}
+                        </p>
+                    </div>
+                </div>
+                {% if settings.footer_text %}
+                <div class="footer-bottom">
+                    {{ settings.footer_text }}
+                </div>
+                {% else %}
+                <div class="footer-bottom">
+                    Stock - Solutions Technologiques & Accessoires
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function(){
+            document.getElementById('printBtn')?.addEventListener('click', function(){ window.print(); });
+            document.getElementById('returnBtn')?.addEventListener('click', function(){ window.location.href = appPath('/delivery-notes'); });
+        };
+    </script>
+</body>
+</html>
+
+

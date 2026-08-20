@@ -1,0 +1,9 @@
+.git
+data
+n8n
+logs
+letsencrypt
+certbot-webroot
+__pycache__
+*.pyc
+.env

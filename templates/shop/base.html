@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Stock — High-tech & Gaming{% endblock %}</title>
+  <meta name="description" content="{% block description %}Boutique high-tech Stock: ordinateurs, gaming, smartphones et accessoires. Matériel sélectionné, testé et garanti.{% endblock %}">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/static/css/shop.css?v=19">
+
+  <script>
+    // Thème appliqué avant le premier rendu pour éviter tout clignotement.
+    (function () {
+      try {
+        var saved = localStorage.getItem('stock-shop-theme');
+        if (saved === 'dark' || saved === 'light') {
+          document.documentElement.setAttribute('data-theme', saved);
+        }
+      } catch (e) { }
+    })();
+  </script>
+  {% block head_extra %}{% endblock %}
+</head>
+
+<body>
+  <!-- 1. Barre utilitaire -->
+  <div class="utilbar">
+    <div class="wrap utilbar-inner">
+      <span class="tag"><span class="mark"></span>{{ settings.banner_text }}</span>
+      <div class="utilbar-links">
+        <a href="/e-commerce/produits"><span class="mark tri"></span>Nos rayons</a>
+        <a href="/e-commerce/suivi"><span class="mark"></span>Suivre ma commande</a>
+        <a href="/e-commerce/panier"><span class="mark dot"></span>Mon panier</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. En-tête principal -->
+  <div class="mainbar">
+    <div class="wrap mainbar-inner">
+      <a href="/e-commerce" class="logo">GAPS<span class="sep">·</span>APPLE</a>
+
+      <button class="burger" id="burgerBtn" aria-label="Tous les rayons" title="Tous les rayons">
+        <i class="bi bi-list"></i>
+      </button>
+
+      <form class="searchbox" action="/e-commerce/produits" method="get">
+        <button type="button" class="searchbox-cat" id="catToggle" aria-expanded="false">
+          <span id="catToggleLabel">Tous les rayons</span>
+          <i class="bi bi-chevron-right"></i>
+        </button>
+        <input type="hidden" name="category" id="searchCategory" value="{{ request.query_params.get('category', '') }}">
+        <input type="search" name="search" placeholder="Rechercher un produit…"
+          value="{{ request.query_params.get('search', '') }}" aria-label="Rechercher">
+        <button type="submit" class="go" aria-label="Lancer la recherche"><i class="bi bi-search"></i></button>
+
+        <div class="catpanel" id="catPanel"></div>
+      </form>
+
+      <div class="header-icons">
+        <button class="hicon" id="themeToggle" aria-label="Changer de thème" title="Changer de thème">
+          <i class="bi bi-moon" id="themeIcon"></i>
+        </button>
+        <a href="/e-commerce/suivi" class="hicon" aria-label="Suivi de commande" title="Suivre ma commande">
+          <i class="bi bi-person"></i>
+        </a>
+        <a href="/e-commerce/panier" class="hicon" aria-label="Panier" title="Panier">
+          <i class="bi bi-bag"></i>
+          <span class="badge-count" id="cartCount" data-count="0"></span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Rayons -->
+  <nav class="catbar">
+    <div class="wrap catbar-inner" id="catBar"></div>
+  </nav>
+
+  {% block content %}{% endblock %}
+
+  <!-- Newsletter -->
+  <section class="newsletter">
+    <div class="wrap newsletter-inner">
+      <h3>Restez informé</h3>
+      <p>Nouveautés, arrivages et offres — directement chez vous.</p>
+      <form class="newsletter-form" id="newsletterForm">
+        <input type="email" placeholder="Votre email" required aria-label="Votre email">
+        <button type="submit" aria-label="S'inscrire"><i class="bi bi-caret-right-fill"></i></button>
+      </form>
+    </div>
+  </section>
+
+  <!-- Pied de page -->
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-logo">GAPS·APPLE</div>
+          <div class="footer-call">Une question ? Appelez-nous</div>
+          <div class="footer-phone" id="footerPhone">—</div>
+          <p style="color:var(--text-mid);font-size:.93rem;line-height:1.7;margin:22px 0 0;max-width:320px">
+            Matériel informatique et gaming sélectionné, testé et garanti.
+          </p>
+        </div>
+        <div>
+          <h4>Boutique</h4>
+          <ul>
+            <li><a href="/e-commerce/produits">Tous les produits</a></li>
+            <li><a href="/e-commerce/produits?availability=en+stock">Disponible tout de suite</a></li>
+            <li><a href="/e-commerce/produits?availability=sur+commande">Sur commande</a></li>
+            <li><a href="/e-commerce/produits?sort=price_asc">Meilleurs prix</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Aide</h4>
+          <ul>
+            <li><a href="/e-commerce/suivi">Suivre ma commande</a></li>
+            <li><a href="/e-commerce/panier">Mon panier</a></li>
+            <li><a href="/e-commerce/produits">Nos rayons</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Contact</h4>
+          <ul id="footerContact">
+            <li><span style="color:var(--text-mid);font-size:.93rem">Dakar, Sénégal</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© <span id="year"></span> Stock. Tous droits réservés.</span>
+        <span>Conçu au Sénégal</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Colonne d'actions flottante -->
+  <div class="railbtns">
+    <a href="#" class="railbtn wa" id="waRail" target="_blank" rel="noopener" style="display:none"
+      aria-label="WhatsApp" title="Nous écrire sur WhatsApp"><i class="bi bi-whatsapp"></i></a>
+    <a href="/e-commerce/panier" class="railbtn cart" aria-label="Panier" title="Panier">
+      <i class="bi bi-cart"></i>
+      <span class="badge-count" id="cartCountRail" data-count="0"></span>
+    </a>
+  </div>
+
+  <div class="toast-stack" id="toastStack"></div>
+
+  <script src="/static/js/shop.js?v=14"></script>
+  {% block scripts %}{% endblock %}
+</body>
+
+</html>

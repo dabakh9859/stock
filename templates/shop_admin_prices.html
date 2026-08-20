@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des prix - Boutique{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h1 class="h3 mb-1">Gestion des prix</h1>
+  <p class="text-muted mb-0">
+    Prix de vente en boutique et exceptions sur les suppléments hérités, produit par produit.
+  </p>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <label class="form-label">Rechercher un produit</label>
+    <input type="text" class="form-control" id="recherche"
+           placeholder="Nom, marque ou modèle…" autocomplete="off">
+    <div id="resultats" class="list-group mt-2 d-none" style="max-height: 300px; overflow: auto;"></div>
+  </div>
+</div>
+
+<div id="fiche" class="d-none">
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <h2 class="h5 mb-1" id="ficheNom">—</h2>
+      <p class="text-muted small mb-3" id="ficheCategorie"></p>
+
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Prix en stock</label>
+          <input type="text" class="form-control" id="prixStock" disabled>
+          <div class="form-text">Référence issue de l'application de stock, non modifiable ici.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Prix boutique</label>
+          <input type="number" class="form-control" id="prixBoutique" placeholder="laisser vide">
+          <div class="form-text">Vide = le prix du stock s'applique.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Ancien prix</label>
+          <input type="number" class="form-control" id="ancienPrix" placeholder="facultatif">
+          <div class="form-text">Renseigné, il affiche un badge promotion barré.</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary mt-3" onclick="enregistrerPrix()">
+        <i class="bi bi-check-lg me-1"></i>Enregistrer le prix
+      </button>
+    </div>
+  </div>
+
+  <!-- Ce que le client verra réellement, suppléments compris -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <h3 class="h6 text-muted mb-3">Ce que verra le client</h3>
+      <div class="d-flex flex-wrap gap-4">
+        <div>
+          <div class="text-muted small">Prix affiché au catalogue</div>
+          <div class="fs-4 fw-semibold" id="apercuPrix">—</div>
+          <div class="text-muted small" id="apercuMention"></div>
+        </div>
+        <div>
+          <div class="text-muted small">Fourchette</div>
+          <div class="fs-5" id="apercuFourchette">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="zoneVariantes"></div>
+</div>
+
+<div id="aucuneSelection" class="text-center text-muted py-5">
+  <i class="bi bi-search fs-1 d-block mb-2 opacity-50"></i>
+  Recherchez un produit pour voir et modifier ses prix.
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  "use strict";
+
+  const API = "/api/shop/admin/variants";
+  let produitCourant = null;
+
+  const nf = new Intl.NumberFormat("fr-FR");
+  const money = (v) => nf.format(Math.round(v || 0)) + " F";
+  const delta = (v) => (v > 0 ? "+" : "") + nf.format(v) + " F";
+
+  function el(balise, classe, texte) {
+    const n = document.createElement(balise);
+    if (classe) n.className = classe;
+    if (texte !== undefined) n.textContent = texte;
+    return n;
+  }
+
+  /* --- Recherche ---------------------------------------------------------- */
+
+  let minuteur = null;
+  document.getElementById("recherche").addEventListener("input", function () {
+    clearTimeout(minuteur);
+    const q = this.value.trim();
+    if (q.length < 2) {
+      document.getElementById("resultats").classList.add("d-none");
+      return;
+    }
+    minuteur = setTimeout(async () => {
+      try {
+        const r = await axios.get(API + "/products/search", { params: { q } });
+        afficherResultats(r.data);
+      } catch (e) { showError("Recherche impossible"); }
+    }, 250);
+  });
+
+  function afficherResultats(produits) {
+    const hote = document.getElementById("resultats");
+    hote.textContent = "";
+    hote.classList.remove("d-none");
+
+    if (!produits.length) {
+      hote.appendChild(el("div", "list-group-item text-muted", "Aucun produit trouvé"));
+      return;
+    }
+    produits.forEach((p) => {
+      const item = el("button", "list-group-item list-group-item-action d-flex justify-content-between align-items-center");
+      const gauche = el("span");
+      gauche.appendChild(el("strong", null, p.name));
+      if (p.category) gauche.appendChild(el("span", "text-muted small ms-2", p.category));
+      item.appendChild(gauche);
+      item.appendChild(el("span", "text-muted",
+        p.shop_price !== null ? money(p.shop_price) : money(p.prix_stock)));
+      item.onclick = () => ouvrirProduit(p.product_id);
+      hote.appendChild(item);
+    });
+  }
+
+  /* --- Fiche produit ------------------------------------------------------ */
+
+  async function ouvrirProduit(id) {
+    try {
+      const r = await axios.get(API + "/product/" + id);
+      produitCourant = r.data;
+      document.getElementById("resultats").classList.add("d-none");
+      document.getElementById("aucuneSelection").classList.add("d-none");
+      document.getElementById("fiche").classList.remove("d-none");
+      rendreFiche();
+    } catch (e) { showError("Chargement impossible"); }
+  }
+
+  function rendreFiche() {
+    const d = produitCourant;
+    document.getElementById("ficheNom").textContent = d.name;
+    document.getElementById("ficheCategorie").textContent = d.category || "Sans catégorie";
+    document.getElementById("prixStock").value = money(d.prix_stock);
+    document.getElementById("prixBoutique").value = d.shop_price !== null ? d.shop_price : "";
+    document.getElementById("ancienPrix").value = d.old_price !== null ? d.old_price : "";
+
+    document.getElementById("apercuPrix").textContent = money(d.prix_defaut);
+    document.getElementById("apercuMention").textContent =
+      d.a_partir_de ? "précédé de « À partir de »" : "prix ferme";
+    document.getElementById("apercuFourchette").textContent =
+      d.prix_min === d.prix_max ? "—" : money(d.prix_min) + " à " + money(d.prix_max);
+
+    rendreVariantes();
+  }
+
+  function rendreVariantes() {
+    const hote = document.getElementById("zoneVariantes");
+    hote.textContent = "";
+    const d = produitCourant;
+
+    if (!d.groupes.length) {
+      const carte = el("div", "card");
+      const corps = el("div", "card-body text-muted");
+      corps.append(
+        el("p", "mb-1", "Ce produit n'a aucune variante."),
+        el("p", "small mb-0",
+          "Rattachez un groupe à sa catégorie ou à lui-même depuis « Gestion des variantes ».")
+      );
+      carte.appendChild(corps);
+      hote.appendChild(carte);
+      return;
+    }
+
+    d.groupes.forEach((groupe) => {
+      const carte = el("div", "card mb-3");
+      const corps = el("div", "card-body");
+      corps.appendChild(el("h3", "h6 mb-3", groupe.nom));
+
+      const tableau = el("table", "table table-sm align-middle mb-0");
+      const thead = el("thead");
+      const trh = el("tr");
+      ["Option", "Supplément appliqué", "Prix résultant", "Exception"].forEach(
+        (t) => trh.appendChild(el("th", null, t)));
+      thead.appendChild(trh);
+      tableau.appendChild(thead);
+
+      const tbody = el("tbody");
+      groupe.options.forEach((option) => {
+        const tr = el("tr");
+
+        const tdLib = el("td");
+        tdLib.appendChild(document.createTextNode(option.libelle));
+        if (option.par_defaut) {
+          const b = el("span", "badge bg-success ms-2", "par défaut");
+          b.title = "Option présélectionnée : c'est elle qui fixe le prix affiché";
+          tdLib.appendChild(b);
+        }
+        tr.appendChild(tdLib);
+
+        const tdDelta = el("td", "font-monospace");
+        tdDelta.appendChild(document.createTextNode(delta(option.supplement)));
+        if (option.surchargee) {
+          tdDelta.appendChild(el("span", "badge bg-warning text-dark ms-2", "exception"));
+        }
+        tr.appendChild(tdDelta);
+
+        tr.appendChild(el("td", null, money(option.prix)));
+
+        const tdAct = el("td");
+        tdAct.style.width = "1%";
+        tdAct.style.whiteSpace = "nowrap";
+        const grp = el("div", "btn-group btn-group-sm");
+
+        const bModif = el("button", "btn btn-outline-secondary");
+        bModif.title = "Fixer un supplément propre à ce produit";
+        bModif.innerHTML = '<i class="bi bi-pencil"></i>';
+        bModif.onclick = () => surcharger(option);
+        grp.appendChild(bModif);
+
+        const bMasque = el("button", "btn btn-outline-secondary");
+        bMasque.title = "Masquer cette option sur ce produit";
+        bMasque.innerHTML = '<i class="bi bi-eye-slash"></i>';
+        bMasque.onclick = () => masquer(option);
+        grp.appendChild(bMasque);
+
+        if (option.surchargee) {
+          const bReset = el("button", "btn btn-outline-danger");
+          bReset.title = "Revenir à la valeur du groupe";
+          bReset.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+          bReset.onclick = () => reinitialiser(option);
+          grp.appendChild(bReset);
+        }
+
+        tdAct.appendChild(grp);
+        tr.appendChild(tdAct);
+        tbody.appendChild(tr);
+      });
+      tableau.appendChild(tbody);
+      corps.appendChild(tableau);
+      carte.appendChild(corps);
+      hote.appendChild(carte);
+    });
+
+    const note = el("p", "text-muted small",
+      "Une exception ne concerne que ce produit : les autres produits de la catégorie gardent la valeur du groupe.");
+    hote.appendChild(note);
+  }
+
+  /* --- Écritures ---------------------------------------------------------- */
+
+  window.enregistrerPrix = async function () {
+    const boutique = document.getElementById("prixBoutique").value;
+    const ancien = document.getElementById("ancienPrix").value;
+    try {
+      await axios.put(API + "/product/" + produitCourant.product_id + "/price", {
+        shop_price: boutique === "" ? null : Number(boutique),
+        old_price: ancien === "" ? null : Number(ancien)
+      });
+      showSuccess("Prix enregistré");
+      ouvrirProduit(produitCourant.product_id);
+    } catch (e) {
+      showError(e.response?.data?.detail || "Enregistrement impossible");
+    }
+  };
+
+  async function surcharger(option) {
+    const brut = prompt(
+      `Supplément de « ${option.libelle} » pour CE produit uniquement, en francs :`,
+      String(option.supplement));
+    if (brut === null) return;
+    await ecrireSurcharge(option.id, Number(String(brut).replace(/[^\d.-]/g, "")) || 0, false);
+  }
+
+  async function masquer(option) {
+    if (!confirm(`Masquer « ${option.libelle} » sur ce produit ? Les autres produits ne sont pas touchés.`)) return;
+    await ecrireSurcharge(option.id, null, true);
+  }
+
+  async function reinitialiser(option) {
+    await ecrireSurcharge(option.id, null, false);
+  }
+
+  async function ecrireSurcharge(optionId, prix, masquee) {
+    try {
+      await axios.put(API + "/product/" + produitCourant.product_id + "/override", {
+        option_id: optionId, price_delta: prix, is_hidden: masquee
+      });
+      showSuccess("Enregistré");
+      ouvrirProduit(produitCourant.product_id);
+    } catch (e) {
+      showError(e.response?.data?.detail || "Enregistrement impossible");
+    }
+  }
+})();
+</script>
+{% endblock %}

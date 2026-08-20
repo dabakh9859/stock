@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+
+{% block title %}Gestion des variantes - Boutique{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+  <div>
+    <h1 class="h3 mb-1">Gestion des variantes</h1>
+    <p class="text-muted mb-0">
+      Déclarez un choix une seule fois, puis rattachez-le aux catégories ou aux produits voulus.
+    </p>
+  </div>
+  <button class="btn btn-primary" onclick="ouvrirGroupe()">
+    <i class="bi bi-plus-lg me-1"></i>Nouveau groupe
+  </button>
+</div>
+
+<div class="alert alert-secondary d-flex gap-2 align-items-start">
+  <i class="bi bi-info-circle mt-1"></i>
+  <div>
+    <strong>La première option d'un groupe est celle présélectionnée sur le site.</strong>
+    C'est elle qui détermine le prix affiché au catalogue. Faites-la glisser en tête
+    avec les flèches si besoin. Les suppléments s'ajoutent au prix du produit ;
+    plusieurs groupes se cumulent.
+    <br>
+    Ces variantes sont propres à la boutique en ligne : elles n'ont aucun lien
+    avec les {{ mot('variantes') | lower }} du stock.
+  </div>
+</div>
+
+<div id="listeGroupes" class="d-flex flex-column gap-3">
+  <p class="text-muted">Chargement…</p>
+</div>
+
+
+<!-- Modale : créer / modifier un groupe -->
+<div class="modal fade" id="modaleGroupe" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="titreModaleGroupe">Nouveau groupe</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="groupeId">
+        <div class="mb-3">
+          <label class="form-label">Nom du choix <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="groupeNom" placeholder="Couleur, Capacité…">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Aide affichée sous le sélecteur</label>
+          <input type="text" class="form-control" id="groupeAide"
+                 placeholder="Facultatif — ex. « Choisissez votre finition »">
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="groupeActif" checked>
+          <label class="form-check-label" for="groupeActif">
+            Actif — un groupe inactif disparaît du site sans être supprimé
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-primary" onclick="enregistrerGroupe()">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modale : rattacher un groupe -->
+<div class="modal fade" id="modaleRattachement" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Rattacher « <span id="rattGroupeNom"></span> »</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="rattGroupeId">
+        <div class="mb-3">
+          <label class="form-label">Rattacher à</label>
+          <select class="form-select" id="rattType" onchange="basculerCibleRattachement()">
+            <option value="category">Des catégories — tous leurs produits en héritent</option>
+            <option value="product">Des produits précis</option>
+          </select>
+        </div>
+
+        <div class="mb-3" id="blocCategorie">
+          <label class="form-label">Catégories</label>
+          <div id="rattCategories" class="border rounded p-2"
+               style="max-height: 220px; overflow: auto;"></div>
+        </div>
+
+        <div class="mb-3 d-none" id="blocProduit">
+          <label class="form-label">Produits</label>
+          <input type="text" class="form-control mb-2" id="rattRecherche"
+                 placeholder="Rechercher un produit…" oninput="chercherProduitsRatt()">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="toutCocher(true)">Tout cocher</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    onclick="toutCocher(false)">Tout décocher</button>
+          </div>
+          <div id="rattProduits" class="border rounded p-2"
+               style="max-height: 240px; overflow: auto;">
+            <p class="text-muted small mb-0">Tapez au moins deux caractères pour chercher.</p>
+          </div>
+        </div>
+
+        <!-- La sélection survit aux recherches successives : on peut chercher
+             « iphone », cocher, puis chercher « samsung » et cocher encore. -->
+        <p class="small mb-0" id="rattCompteur"></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button class="btn btn-primary" onclick="enregistrerRattachement()">Rattacher</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  "use strict";
+
+  const API = "/api/shop/admin/variants";
+  let groupes = [];
+  let categories = [];
+
+  const nf = new Intl.NumberFormat("fr-FR");
+  const money = (v) => (v > 0 ? "+" : "") + nf.format(v) + " F";
+
+  /* Les libellés viennent de la base : insertion par texte, jamais par HTML. */
+  function el(balise, classe, texte) {
+    const n = document.createElement(balise);
+    if (classe) n.className = classe;
+    if (texte !== undefined) n.textContent = texte;
+    return n;
+  }
+
+  async function charger() {
+    try {
+      const [g, c] = await Promise.all([
+        axios.get(API),
+        axios.get(API + "/categories")
+      ]);
+      groupes = g.data;
+      categories = c.data;
+      rendre();
+    } catch (e) {
+      console.error(e);
+      showError("Impossible de charger les variantes");
+    }
+  }
+
+  function rendre() {
+    const hote = document.getElementById("listeGroupes");
+    hote.textContent = "";
+
+    if (!groupes.length) {
+      const vide = el("div", "text-center text-muted py-5");
+      vide.append(
+        el("p", "mb-2", "Aucun groupe de variantes pour l'instant."),
+        el("p", "small mb-0", "Commencez par « Nouveau groupe » : Couleur, Capacité, Finition…")
+      );
+      hote.appendChild(vide);
+      return;
+    }
+
+    groupes.forEach((groupe) => hote.appendChild(carteGroupe(groupe)));
+  }
+
+  function carteGroupe(groupe) {
+    const carte = el("div", "card");
+    const corps = el("div", "card-body");
+
+    // En-tête
+    const tete = el("div", "d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3");
+    const titre = el("div");
+    const h = el("h2", "h5 mb-1");
+    h.append(document.createTextNode(groupe.name));
+    if (!groupe.is_active) {
+      const badge = el("span", "badge bg-secondary ms-2", "inactif");
+      h.appendChild(badge);
+    }
+    titre.appendChild(h);
+    if (groupe.help_text) titre.appendChild(el("p", "text-muted small mb-0", groupe.help_text));
+    tete.appendChild(titre);
+
+    const actions = el("div", "btn-group btn-group-sm");
+    actions.append(
+      bouton("btn-outline-secondary", "bi-pencil", "Modifier", () => ouvrirGroupe(groupe)),
+      bouton("btn-outline-primary", "bi-link-45deg", "Rattacher", () => ouvrirRattachement(groupe)),
+      bouton("btn-outline-danger", "bi-trash", "Supprimer", () => supprimerGroupe(groupe))
+    );
+    tete.appendChild(actions);
+    corps.appendChild(tete);
+
+    // Options
+    const tableau = el("table", "table table-sm align-middle mb-3");
+    const thead = el("thead");
+    const trh = el("tr");
+    ["", "Option", "Supplément", "Actions"].forEach((t) => trh.appendChild(el("th", null, t)));
+    thead.appendChild(trh);
+    tableau.appendChild(thead);
+
+    const tbody = el("tbody");
+    if (!groupe.options.length) {
+      const tr = el("tr");
+      const td = el("td", "text-muted small", "Aucune option — ajoutez-en au moins une.");
+      td.colSpan = 4;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+    groupe.options.forEach((option, i) => {
+      const tr = el("tr");
+
+      const tdRang = el("td", "text-muted small");
+      tdRang.style.width = "1%";
+      tdRang.style.whiteSpace = "nowrap";
+      if (i === 0) {
+        const badge = el("span", "badge bg-success", "par défaut");
+        badge.title = "Option présélectionnée sur le site : c'est elle qui fixe le prix affiché";
+        tdRang.appendChild(badge);
+      } else {
+        tdRang.appendChild(bouton("btn-outline-secondary btn-sm", "bi-arrow-up", "Monter",
+          () => deplacerOption(groupe, i, -1)));
+      }
+      tr.appendChild(tdRang);
+
+      const tdLib = el("td");
+      tdLib.appendChild(document.createTextNode(option.label));
+      if (!option.is_active) tdLib.appendChild(el("span", "badge bg-secondary ms-2", "inactive"));
+      tr.appendChild(tdLib);
+
+      tr.appendChild(el("td", "font-monospace", money(option.price_delta)));
+
+      const tdAct = el("td");
+      tdAct.style.width = "1%";
+      const grp = el("div", "btn-group btn-group-sm");
+      grp.append(
+        bouton("btn-outline-secondary", "bi-pencil", "Modifier", () => modifierOption(groupe, option)),
+        bouton("btn-outline-danger", "bi-x-lg", "Supprimer", () => supprimerOption(groupe, option))
+      );
+      tdAct.appendChild(grp);
+      tr.appendChild(tdAct);
+
+      tbody.appendChild(tr);
+    });
+    tableau.appendChild(tbody);
+    corps.appendChild(tableau);
+
+    const ajout = el("button", "btn btn-sm btn-outline-primary mb-3");
+    ajout.innerHTML = '<i class="bi bi-plus-lg me-1"></i>Ajouter une option';
+    ajout.onclick = () => ajouterOption(groupe);
+    corps.appendChild(ajout);
+
+    // Rattachements
+    const zone = el("div", "border-top pt-3");
+    zone.appendChild(el("div", "text-muted small mb-2", "Appliqué à :"));
+    const puces = el("div", "d-flex flex-wrap gap-2");
+    if (!groupe.assignments.length) {
+      puces.appendChild(el("span", "text-muted small",
+        "Nulle part — ce groupe n'apparaît sur aucun produit."));
+    }
+    groupe.assignments.forEach((a) => {
+      const puce = el("span", "badge bg-light text-dark border d-inline-flex align-items-center gap-2");
+      const icone = el("i", a.target_type === "category" ? "bi bi-tags" : "bi bi-box");
+      puce.appendChild(icone);
+      puce.appendChild(document.createTextNode(
+        a.target_type === "category" ? a.category_name : nomProduit(a.product_id)));
+      const x = el("button", "btn-close btn-close-sm");
+      x.style.fontSize = "0.5rem";
+      x.title = "Retirer ce rattachement";
+      x.onclick = () => detacher(a.assignment_id);
+      puce.appendChild(x);
+      puces.appendChild(puce);
+    });
+    zone.appendChild(puces);
+    corps.appendChild(zone);
+
+    carte.appendChild(corps);
+    return carte;
+  }
+
+  const nomsProduits = {};
+  function nomProduit(id) { return nomsProduits[id] || ("Produit #" + id); }
+
+  function bouton(classe, icone, titre, action) {
+    const b = el("button", "btn " + classe);
+    b.title = titre;
+    b.innerHTML = '<i class="bi ' + icone + '"></i>';
+    b.onclick = action;
+    return b;
+  }
+
+  /* --- Groupes ----------------------------------------------------------- */
+
+  window.ouvrirGroupe = function (groupe) {
+    document.getElementById("groupeId").value = groupe ? groupe.group_id : "";
+    document.getElementById("groupeNom").value = groupe ? groupe.name : "";
+    document.getElementById("groupeAide").value = groupe && groupe.help_text ? groupe.help_text : "";
+    document.getElementById("groupeActif").checked = groupe ? groupe.is_active : true;
+    document.getElementById("titreModaleGroupe").textContent =
+      groupe ? "Modifier le groupe" : "Nouveau groupe";
+    new bootstrap.Modal(document.getElementById("modaleGroupe")).show();
+  };
+
+  window.enregistrerGroupe = async function () {
+    const id = document.getElementById("groupeId").value;
+    const corps = {
+      name: document.getElementById("groupeNom").value.trim(),
+      help_text: document.getElementById("groupeAide").value.trim() || null,
+      sort_order: 0,
+      is_active: document.getElementById("groupeActif").checked
+    };
+    if (!corps.name) { showError("Le nom est obligatoire"); return; }
+    try {
+      if (id) await axios.put(API + "/" + id, corps);
+      else await axios.post(API, corps);
+      bootstrap.Modal.getInstance(document.getElementById("modaleGroupe")).hide();
+      showSuccess("Groupe enregistré");
+      charger();
+    } catch (e) {
+      showError(e.response?.data?.detail || "Enregistrement impossible");
+    }
+  };
+
+  async function supprimerGroupe(groupe) {
+    if (!confirm(`Supprimer « ${groupe.name} » ? Ses options et ses rattachements seront retirés de tous les produits concernés.`)) return;
+    try {
+      await axios.delete(API + "/" + groupe.group_id);
+      showSuccess("Groupe supprimé");
+      charger();
+    } catch (e) { showError("Suppression impossible"); }
+  }
+
+  /* --- Options ----------------------------------------------------------- */
+
+  async function ajouterOption(groupe) {
+    const label = prompt("Libellé de l'option (ex. Noir, 256 Go) :");
+    if (!label) return;
+    const brut = prompt(`Supplément pour « ${label} », en francs.\n0 si cette option n'ajoute rien au prix.`, "0");
+    if (brut === null) return;
+    const delta = Number(String(brut).replace(/[^\d.-]/g, "")) || 0;
+    try {
+      await axios.post(`${API}/${groupe.group_id}/options`,
+        { label: label.trim(), price_delta: delta, sort_order: 0, is_active: true });
+      showSuccess("Option ajoutée");
+      charger();
+    } catch (e) {
+      showError(e.response?.data?.detail || "Ajout impossible");
+    }
+  }
+
+  async function modifierOption(groupe, option) {
+    const label = prompt("Libellé :", option.label);
+    if (label === null) return;
+    const brut = prompt("Supplément en francs :", String(option.price_delta));
+    if (brut === null) return;
+    try {
+      await axios.put(`${API}/options/${option.option_id}`, {
+        label: label.trim(),
+        price_delta: Number(String(brut).replace(/[^\d.-]/g, "")) || 0,
+        sort_order: option.sort_order,
+        is_active: option.is_active
+      });
+      showSuccess("Option modifiée");
+      charger();
+    } catch (e) { showError("Modification impossible"); }
+  }
+
+  async function supprimerOption(groupe, option) {
+    if (!confirm(`Supprimer l'option « ${option.label} » ?`)) return;
+    try {
+      await axios.delete(`${API}/options/${option.option_id}`);
+      showSuccess("Option supprimée");
+      charger();
+    } catch (e) { showError("Suppression impossible"); }
+  }
+
+  /* Remonter une option la fait éventuellement passer en tête — donc devenir
+     l'option par défaut, et changer le prix affiché au catalogue. */
+  async function deplacerOption(groupe, index, sens) {
+    const ordre = groupe.options.map((o) => o.option_id);
+    const cible = index + sens;
+    if (cible < 0 || cible >= ordre.length) return;
+    [ordre[index], ordre[cible]] = [ordre[cible], ordre[index]];
+    try {
+      await axios.post(API + "/options/reorder", ordre);
+      charger();
+    } catch (e) { showError("Réordonnancement impossible"); }
+  }
+
+  /* --- Rattachements ------------------------------------------------------ */
+
+  /* La sélection est gardée hors du DOM : les cases disparaissent à chaque
+     nouvelle recherche, mais ce qui a été coché reste coché. On peut donc
+     chercher « iphone », cocher, puis chercher « samsung » et cocher encore. */
+  const selection = { categories: new Set(), produits: new Map() };
+
+  window.ouvrirRattachement = function (groupe) {
+    document.getElementById("rattGroupeId").value = groupe.group_id;
+    document.getElementById("rattGroupeNom").textContent = groupe.name;
+
+    selection.categories.clear();
+    selection.produits.clear();
+    document.getElementById("rattRecherche").value = "";
+
+    // Cases des catégories, avec le nombre de produits que chacune emporte.
+    const hote = document.getElementById("rattCategories");
+    hote.textContent = "";
+    categories.forEach((c) => {
+      hote.appendChild(caseACocher(
+        "cat-" + c.name,
+        `${c.name} (${c.nb_produits} produits)`,
+        false,
+        (coche) => {
+          if (coche) selection.categories.add(c.name);
+          else selection.categories.delete(c.name);
+          majCompteur();
+        }
+      ));
+    });
+
+    const zone = document.getElementById("rattProduits");
+    zone.textContent = "";
+    zone.appendChild(el("p", "text-muted small mb-0",
+      "Tapez au moins deux caractères pour chercher."));
+
+    document.getElementById("rattType").value = "category";
+    basculerCibleRattachement();
+    majCompteur();
+    new bootstrap.Modal(document.getElementById("modaleRattachement")).show();
+  };
+
+  function caseACocher(id, libelle, coche, auChangement) {
+    const bloc = el("div", "form-check");
+    const input = document.createElement("input");
+    input.className = "form-check-input";
+    input.type = "checkbox";
+    input.id = id;
+    input.checked = coche;
+    input.onchange = () => auChangement(input.checked);
+    const label = el("label", "form-check-label", libelle);
+    label.setAttribute("for", id);
+    bloc.append(input, label);
+    return bloc;
+  }
+
+  function majCompteur() {
+    const type = document.getElementById("rattType").value;
+    const n = type === "category" ? selection.categories.size : selection.produits.size;
+    const quoi = type === "category"
+      ? (n > 1 ? "catégories sélectionnées" : "catégorie sélectionnée")
+      : (n > 1 ? "produits sélectionnés" : "produit sélectionné");
+    const compteur = document.getElementById("rattCompteur");
+    compteur.textContent = n ? `${n} ${quoi}` : "Aucune sélection";
+    compteur.className = n ? "small mb-0 text-success" : "small mb-0 text-muted";
+  }
+
+  window.basculerCibleRattachement = function () {
+    const type = document.getElementById("rattType").value;
+    document.getElementById("blocCategorie").classList.toggle("d-none", type !== "category");
+    document.getElementById("blocProduit").classList.toggle("d-none", type !== "product");
+    majCompteur();
+  };
+
+  window.toutCocher = function (coche) {
+    document.querySelectorAll("#rattProduits input[type=checkbox]").forEach((c) => {
+      if (c.checked !== coche) { c.checked = coche; c.onchange(); }
+    });
+  };
+
+  let minuteurRecherche = null;
+  window.chercherProduitsRatt = function () {
+    clearTimeout(minuteurRecherche);
+    const q = document.getElementById("rattRecherche").value.trim();
+    const zone = document.getElementById("rattProduits");
+    if (q.length < 2) {
+      zone.textContent = "";
+      zone.appendChild(el("p", "text-muted small mb-0",
+        "Tapez au moins deux caractères pour chercher."));
+      return;
+    }
+    minuteurRecherche = setTimeout(async () => {
+      try {
+        const r = await axios.get(API + "/products/search", { params: { q, limite: 50 } });
+        zone.textContent = "";
+        if (!r.data.length) {
+          zone.appendChild(el("p", "text-muted small mb-0", "Aucun produit trouvé."));
+          return;
+        }
+        r.data.forEach((p) => {
+          nomsProduits[p.product_id] = p.name;
+          const libelle = p.category ? `${p.name} — ${p.category}` : p.name;
+          zone.appendChild(caseACocher(
+            "prod-" + p.product_id,
+            libelle,
+            selection.produits.has(p.product_id),
+            (coche) => {
+              if (coche) selection.produits.set(p.product_id, p.name);
+              else selection.produits.delete(p.product_id);
+              majCompteur();
+            }
+          ));
+        });
+      } catch (e) { showError("Recherche impossible"); }
+    }, 250);
+  };
+
+  window.enregistrerRattachement = async function () {
+    const groupId = document.getElementById("rattGroupeId").value;
+    const type = document.getElementById("rattType").value;
+    const corps = {
+      category_names: type === "category" ? [...selection.categories] : [],
+      product_ids: type === "product" ? [...selection.produits.keys()] : []
+    };
+    if (!corps.category_names.length && !corps.product_ids.length) {
+      showError("Sélectionnez au moins une cible");
+      return;
+    }
+    try {
+      const r = await axios.post(`${API}/${groupId}/assignments/bulk`, corps);
+      bootstrap.Modal.getInstance(document.getElementById("modaleRattachement")).hide();
+      const { ajoutes, ignores } = r.data;
+      showSuccess(ignores
+        ? `${ajoutes} rattachement(s) ajouté(s), ${ignores} déjà en place`
+        : `${ajoutes} rattachement(s) ajouté(s)`);
+      charger();
+    } catch (e) {
+      showError(e.response?.data?.detail || "Rattachement impossible");
+    }
+  };
+
+  async function detacher(id) {
+    try {
+      await axios.delete(API + "/assignments/" + id);
+      charger();
+    } catch (e) { showError("Retrait impossible"); }
+  }
+
+  charger();
+})();
+</script>
+{% endblock %}

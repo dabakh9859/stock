@@ -1,0 +1,125 @@
+# Docker Compose configuration for Stock
+# Note: 'version' is obsolete in recent Docker Compose versions
+
+services:
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: stock_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: stock
+      POSTGRES_USER: stock
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-CHANGEZ_MOI_mot_de_passe_postgres}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stock"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stock_app
+    environment:
+      # PostgreSQL - base de données
+      DATABASE_URL: postgresql://stock:${POSTGRES_PASSWORD:-CHANGEZ_MOI_mot_de_passe_postgres}@postgres:5432/stock
+      DB_SSLMODE: "disable"
+      HOST: 0.0.0.0
+      PORT: "8000"
+      RELOAD: "false"
+      INIT_DB_ON_STARTUP: "true"
+      SEED_DEFAULT_DATA: "true"
+      ENABLE_MIGRATIONS_WORKER: "false"
+      GOOGLE_SHEETS_CREDENTIALS_PATH: /app/credentials/symbolic-folio-470422-v3-71562b79a03f.json
+      GOOGLE_SHEETS_SPREADSHEET_ID: 1VHMujdZw-iPs28pz1rC9Ol72T9l9YTW6Wr9j5ujEsXQ
+      GOOGLE_SHEETS_WORKSHEET_NAME: Les produits
+      GOOGLE_SHEETS_AUTO_SYNC: "true"
+      # URL publique de l'application
+      APP_PUBLIC_URL: "http://localhost:8000"
+      APP_NAME: "Stock"
+      # Evolution API (WhatsApp)
+      EVOLUTION_API_URL: "http://evolution-api:8080"
+      EVOLUTION_API_KEY: "${EVOLUTION_API_KEY:-CHANGEZ_MOI_cle_evolution}"
+      EVOLUTION_INSTANCE_NAME: "stock"
+      # Internal Docker network URL for PDF generation
+      APP_INTERNAL_URL: "http://stock_app:8000"
+      # Debt reminder / Twilio will be injected from .env via env_file above
+    volumes:
+      - ./static/uploads:/app/static/uploads
+      - ./static/js:/app/static/js
+      - ./static/css:/app/static/css
+      - ./templates:/app/templates
+      - ./logs:/app/logs
+      - ./credentials:/app/credentials:ro
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  evolution-api:
+    image: atendai/evolution-api:v2.2.3
+    container_name: stock_evolution
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-CHANGEZ_MOI_cle_evolution}
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://stock:${POSTGRES_PASSWORD:-CHANGEZ_MOI_mot_de_passe_postgres}@postgres:5432/evolution
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
+      - LOG_LEVEL=WARN
+      - DEL_INSTANCE=false
+      - QRCODE_LIMIT=10
+      - CONFIG_SESSION_PHONE_CLIENT=Stock
+      - NODE_OPTIONS=--max-old-space-size=512
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://redis:6379
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_LOCAL_ENABLED=false
+    volumes:
+      - ./data/evolution_instances:/evolution/instances
+      - ./data/evolution_store:/evolution/store
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: stock_redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes: {}
