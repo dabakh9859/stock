@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-18T12:00:00+02:00",
+  "title": "Design System: Stock (nom de travail)",
+  "extensions": {
+    "colorMeta": {
+      "navy": { "role": "primary", "displayName": "Operational Navy", "canonical": "#18204e", "tonalRamp": ["#090c20", "#101635", "#18204e", "#303968", "#576083", "#858ca6", "#b8bbcc", "#ebecf2"] },
+      "navy-raised": { "role": "primary", "displayName": "Raised Navy", "canonical": "#222b67", "tonalRamp": ["#0b0e22", "#151a3f", "#222b67", "#394585", "#626da0", "#9299bc", "#c0c4d8", "#edeef4"] },
+      "indigo": { "role": "primary", "displayName": "Connected Indigo", "canonical": "#6673d8", "tonalRamp": ["#141735", "#282e64", "#414995", "#6673d8", "#8993e3", "#aeb5ec", "#d1d5f5", "#f0f1fc"] },
+      "periwinkle": { "role": "secondary", "displayName": "Periwinkle", "canonical": "#aab4ff", "tonalRamp": ["#1c2040", "#343a70", "#535b9f", "#7782cf", "#aab4ff", "#c2c9ff", "#dadeff", "#f1f3ff"] },
+      "cloud": { "role": "neutral", "displayName": "Cloud Ground", "canonical": "#f2f4ff", "tonalRamp": ["#171826", "#30313f", "#525360", "#7b7d89", "#a8aab5", "#d0d2dd", "#e4e6f1", "#f2f4ff"] },
+      "cloud-raised": { "role": "neutral", "displayName": "Raised Cloud", "canonical": "#e6eaff", "tonalRamp": ["#171925", "#30333f", "#525663", "#7b7f8d", "#a5aab9", "#cbd0e0", "#e0e4f5", "#f3f5ff"] },
+      "white": { "role": "neutral", "displayName": "White", "canonical": "#ffffff", "tonalRamp": ["#242424", "#454545", "#666666", "#888888", "#aaaaaa", "#cccccc", "#eeeeee", "#ffffff"] },
+      "action-orange": { "role": "primary", "displayName": "Action Orange", "canonical": "#ff6b3d", "tonalRamp": ["#321006", "#67200d", "#9d3216", "#d74921", "#ff6b3d", "#ff9675", "#ffc1ad", "#ffe8df"] },
+      "action-orange-hover": { "role": "primary", "displayName": "Action Orange Hover", "canonical": "#dc4822", "tonalRamp": ["#2d0c04", "#5d1808", "#8d270f", "#bc3719", "#dc4822", "#ea7958", "#f3ae98", "#fbe4dc"] },
+      "mango": { "role": "secondary", "displayName": "Mango Signal", "canonical": "#ffc94f", "tonalRamp": ["#2b2003", "#5d4507", "#906b0c", "#c4941b", "#ffc94f", "#ffd97c", "#ffe8aa", "#fff5db"] },
+      "mint": { "role": "tertiary", "displayName": "Mint Confirmation", "canonical": "#37c5a0", "tonalRamp": ["#06271f", "#0b503f", "#137b61", "#22a986", "#37c5a0", "#70d8bd", "#a8e9d8", "#ddf7f0"] },
+      "ink": { "role": "neutral", "displayName": "Commerce Ink", "canonical": "#151a3e", "tonalRamp": ["#080914", "#0e1128", "#151a3e", "#333854", "#5c6075", "#8b8e9e", "#bcbec8", "#ececf0"] },
+      "muted": { "role": "neutral", "displayName": "Operational Muted", "canonical": "#62698a", "tonalRamp": ["#11131e", "#262936", "#414658", "#62698a", "#8389a4", "#a8acbf", "#cdcfd9", "#eff0f4"] },
+      "line": { "role": "neutral", "displayName": "Indigo Hairline", "canonical": "rgba(24, 32, 78, .14)", "tonalRamp": ["rgba(24,32,78,.8)", "rgba(24,32,78,.64)", "rgba(24,32,78,.5)", "rgba(24,32,78,.38)", "rgba(24,32,78,.28)", "rgba(24,32,78,.2)", "rgba(24,32,78,.14)", "rgba(24,32,78,.07)"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "World Display", "purpose": "Hero proposition and campaign-scale statements." },
+      "headline": { "displayName": "Narrative Headline", "purpose": "Major section arguments and the four journey states." },
+      "title": { "displayName": "Operational Title", "purpose": "Profile and product-window titles." },
+      "body": { "displayName": "Commerce Body", "purpose": "Short explanations and product guidance." },
+      "label": { "displayName": "Operational Label", "purpose": "Navigation, actions, states, and demonstration metadata." }
+    },
+    "shadows": [
+      { "name": "floating-overlay", "value": "0 24px 70px rgba(41, 49, 105, .16), 0 8px 24px rgba(41, 49, 105, .08)", "purpose": "Events, menus, and operational panels floating in the 2.5D world." },
+      { "name": "action-lift", "value": "0 12px 28px rgba(225, 72, 34, .23)", "purpose": "Orange action at rest." },
+      { "name": "action-lift-hover", "value": "0 17px 35px rgba(225, 72, 34, .29)", "purpose": "Raised orange action on hover." },
+      { "name": "product-window", "value": "0 30px 70px rgba(35,43,96,.22), 0 9px 22px rgba(35,43,96,.1)", "purpose": "Full product preview above the spatial world." },
+      { "name": "assistant-stage", "value": "0 34px 90px rgba(4,8,32,.34)", "purpose": "Assistant demonstration on navy." }
+    ],
+    "motion": [
+      { "name": "state-quick", "value": "200ms ease", "purpose": "Navigation opacity and profile state changes." },
+      { "name": "action-response", "value": "250ms ease", "purpose": "Button translation, fill, and shadow." },
+      { "name": "hero-entrance", "value": "850-1250ms expo.out", "purpose": "Staggered copy, scene, and floating-panel entrance." },
+      { "name": "desktop-spatial-story", "value": "GSAP scrub 0.65 over 4300px", "purpose": "Pinned four-stage supplier-to-overview sequence." },
+      { "name": "mobile-stage", "value": "250-350ms", "purpose": "Sticky-scene opacity and scale changes between four states." },
+      { "name": "reduced-motion", "value": ".01ms", "purpose": "Disable effective animation while revealing every essential story element." }
+    ],
+    "breakpoints": [
+      { "name": "scene-tighten", "value": "1180px" },
+      { "name": "mobile-choreography", "value": "899px" },
+      { "name": "compact-mobile", "value": "480px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The coral-orange action for opening or advancing into the application.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Découvrir l’application <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></a>",
+      "css": ".ds-btn-primary { min-height:55px; padding:0 23px; display:inline-flex; align-items:center; justify-content:center; gap:12px; border:0; border-radius:13px; color:#fff; background:var(--orange,#ff6b3d); box-shadow:0 12px 28px rgba(225,72,34,.23); font:760 15px/1 var(--font-body,Afacad,sans-serif); text-decoration:none; transition:transform .25s ease,background .25s ease,box-shadow .25s ease; } .ds-btn-primary svg { width:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; } .ds-btn-primary:hover { transform:translateY(-3px); background:var(--orange-dark,#dc4822); box-shadow:0 17px 35px rgba(225,72,34,.29); } .ds-btn-primary:focus-visible { outline:3px solid var(--orange,#ff6b3d); outline-offset:4px; } .ds-btn-primary:active { transform:translateY(0); }"
+    },
+    {
+      "name": "Light Action",
+      "kind": "button",
+      "refersTo": "button-light",
+      "description": "The white close-page action on an indigo field.",
+      "html": "<a class=\"ds-btn-light\" href=\"#\">Ouvrir l’application <svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></a>",
+      "css": ".ds-btn-light { min-height:55px; padding:0 23px; display:inline-flex; align-items:center; justify-content:center; gap:12px; border:0; border-radius:13px; color:var(--navy,#18204e); background:#fff; box-shadow:0 14px 30px rgba(20,25,70,.18); font:760 15px/1 var(--font-body,Afacad,sans-serif); text-decoration:none; transition:transform .25s ease,background .25s ease,color .25s ease; } .ds-btn-light svg { width:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; } .ds-btn-light:hover { transform:translateY(-3px); color:#fff; background:var(--orange,#ff6b3d); } .ds-btn-light:focus-visible { outline:3px solid var(--orange,#ff6b3d); outline-offset:4px; } .ds-btn-light:active { transform:translateY(0); }"
+    },
+    {
+      "name": "Operational Event",
+      "kind": "card",
+      "refersTo": "operational-overlay",
+      "description": "Compact proof of a stock, sale, invoice, or supplier event inside the spatial world.",
+      "html": "<article class=\"ds-event\"><span class=\"ds-event-icon\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M4 7l8-4 8 4-8 4-8-4Zm0 0v10l8 4 8-4V7M12 11v10\"/></svg></span><span><small>Stock fictif</small><b>1 224 → 1 248</b></span><strong>+24</strong></article>",
+      "css": ".ds-event { min-width:205px; padding:12px 13px; display:flex; align-items:center; gap:12px; border:1px solid rgba(102,115,216,.15); border-radius:14px; color:var(--ink,#151a3e); background:rgba(255,255,255,.97); box-shadow:0 24px 70px rgba(41,49,105,.16),0 8px 24px rgba(41,49,105,.08); font-family:var(--font-body,Afacad,sans-serif); } .ds-event-icon { width:34px; height:34px; padding:8px; display:grid; place-items:center; border-radius:9px; color:var(--indigo,#6673d8); background:var(--cloud-2,#e6eaff); } .ds-event-icon svg { width:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; } .ds-event span:nth-child(2) { flex:1; display:flex; flex-direction:column; gap:2px; } .ds-event small { color:var(--muted,#62698a); font-size:10px; } .ds-event b { font-size:12px; } .ds-event strong { padding:5px 8px; border-radius:7px; color:#16735c; background:#ddf8ef; font-size:10px; } .ds-event:hover { transform:translateY(-2px); } .ds-event:focus-within { outline:3px solid var(--orange,#ff6b3d); outline-offset:4px; }"
+    },
+    {
+      "name": "Product Window",
+      "kind": "custom",
+      "refersTo": "product-window",
+      "description": "Miniature application overview used as the destination of the spatial story.",
+      "html": "<article class=\"ds-product\"><header><i>S</i><b>Vue d’ensemble</b><small><em></em> données fictives</small></header><div class=\"ds-product-body\"><span>Bonjour Awa,</span><strong>votre boutique aujourd’hui.</strong><div class=\"ds-metrics\"><section><small>Ventes du jour</small><b>428 500 F</b><em>12 ventes validées</em></section><section><small>Articles en stock</small><b>1 248</b><em>32 à surveiller</em></section></div></div></article>",
+      "css": ".ds-product { width:420px; overflow:hidden; border:1px solid #d9ddf0; border-radius:16px; background:#fff; color:var(--ink,#151a3e); box-shadow:0 30px 70px rgba(35,43,96,.22),0 9px 22px rgba(35,43,96,.1); font-family:var(--font-body,Afacad,sans-serif); } .ds-product header { height:48px; padding:0 15px; display:flex; align-items:center; gap:9px; color:#fff; background:var(--navy,#18204e); font-size:10px; } .ds-product header>i { width:25px; height:25px; display:grid; place-items:center; border-radius:7px; background:var(--orange,#ff6b3d); font-style:normal; font-weight:850; } .ds-product header small { margin-left:auto; display:flex; align-items:center; gap:6px; color:#cbd1f7; font-size:8px; } .ds-product header em { width:6px; height:6px; border-radius:50%; background:var(--mint,#37c5a0); } .ds-product-body { padding:21px; display:flex; flex-direction:column; } .ds-product-body>span { color:var(--muted,#62698a); font-size:8px; } .ds-product-body>strong { font:690 15px/1.2 var(--font-display,Sora,sans-serif); } .ds-metrics { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:17px; } .ds-metrics section { padding:12px; display:flex; flex-direction:column; border:1px solid #e5e7f1; border-radius:10px; } .ds-metrics small { color:var(--muted,#62698a); font-size:8px; } .ds-metrics b { margin:4px 0; font-size:14px; } .ds-metrics em { color:#238469; font-size:8px; font-style:normal; } .ds-product:hover { transform:translateY(-2px); } .ds-product:focus-within { outline:3px solid var(--orange,#ff6b3d); outline-offset:4px; }"
+    },
+    {
+      "name": "Profile Selector Row",
+      "kind": "button",
+      "description": "Large Sora métier row with an orange active affordance.",
+      "html": "<button class=\"ds-profile ds-active\"><span>Téléphonie &amp; électronique</span><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg></button>",
+      "css": ".ds-profile { width:100%; min-height:78px; padding:0; display:flex; align-items:center; justify-content:space-between; border:0; border-top:1px solid rgba(24,32,78,.14); border-bottom:1px solid rgba(24,32,78,.14); color:#8b91aa; background:transparent; cursor:pointer; text-align:left; font:650 clamp(19px,2vw,27px)/1.15 var(--font-display,Sora,sans-serif); transition:color .2s ease; } .ds-profile span { transition:transform .2s ease; } .ds-profile svg { width:21px; opacity:0; transform:translateX(-10px); fill:none; stroke:var(--orange,#ff6b3d); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:opacity .2s,transform .2s; } .ds-profile:hover,.ds-profile.ds-active { color:var(--navy,#18204e); } .ds-profile:hover span,.ds-profile.ds-active span { transform:translateX(15px); } .ds-profile.ds-active svg { opacity:1; transform:translateX(0); } .ds-profile:focus-visible { outline:3px solid var(--orange,#ff6b3d); outline-offset:4px; } .ds-profile:active span { transform:translateX(10px); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Le petit monde opérationnel",
+    "overview": "Stock transforme le commerce en un monde 2.5D relié : boutique, fournisseur, cliente, marchandise, événements et application partagent le même espace indigo-pervenche. Les panneaux compacts servent de preuves opérationnelles, jamais de grille SaaS autonome.",
+    "keyCharacteristics": [
+      "Transparent authored 2.5D commerce scenes in one shared palette.",
+      "Dense Sora display over clear Afacad body and operational copy.",
+      "Cloud and indigo grounds with orange action, mango attention, and mint confirmation.",
+      "Pinned desktop spatial story translated into a sticky four-state mobile story.",
+      "Every synthetic metric is explicitly labelled fictive or demonstration."
+    ],
+    "rules": [
+      { "name": "The Orange Means Action Rule", "body": "Orange signals action, active operation, or progress and does not become a decorative section fill.", "section": "colors" },
+      { "name": "The Functional Accent Rule", "body": "Mango attracts attention and mint confirms state; keep those roles stable.", "section": "colors" },
+      { "name": "The Two-Layer Voice Rule", "body": "Sora carries propositions and consequential titles; Afacad explains, guides, quantifies, and triggers action.", "section": "typography" },
+      { "name": "The World Before Widgets Rule", "body": "Establish one continuous world; use compact overlays as operational proof rather than as a standalone card grid.", "section": "layout" },
+      { "name": "The Same Story, New Choreography Rule", "body": "Preserve all four states and their order; change only from pinned desktop to sticky mobile choreography.", "section": "layout" },
+      { "name": "The Operational Lift Rule", "body": "Elevation belongs to objects, controls, and interfaces floating in the world, not to editorial sections.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do build new scenes as one coherent transparent 2.5D world.",
+      "Do use floating interfaces to prove a specific operation and its system effect.",
+      "Do preserve supplier, stock, sale, and overview order across screen sizes.",
+      "Do label every synthetic datum as fictive or demonstration.",
+      "Do keep Stock visibly qualified as a working name.",
+      "Do preserve the complete story with reduced motion enabled."
+    ],
+    "donts": [
+      "Don't return to documentary photography or mix the archived photo world with the shipped 2.5D world.",
+      "Don't replace the spatial scene with a hero-dashboard or SaaS card grid.",
+      "Don't use orange as a large decorative fill or swap mango and mint roles.",
+      "Don't present demo metrics, customers, testimonials, prices, or companies as real.",
+      "Don't introduce decorative eyebrow copy; small labels must name place, state, operation, or data status."
+    ]
+  }
+}

@@ -14,8 +14,11 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+# Ancrées à la racine : sans la barre oblique de tête, ces règles visant les
+# artefacts de construction Python avalaient aussi marketing-site/lib/, un
+# dossier de code source.
+/lib/
+/lib64/
 parts/
 sdist/
 var/
